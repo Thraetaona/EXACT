@@ -1,0 +1,26 @@
+<!DOCTYPE html>
+<html lang="en">
+  <head>
+    <meta charset="UTF-8">
+    <title>ZedAssembly</title>
+    <meta name="title" content="ZedAssembly">
+    <meta name="author" content="Fereydoun Memarzanjany">
+    <meta name="description" content="Z80 Emulator Directly in WebAssembly.">
+    <meta name="keywords" content="zilog, z80, emulator, webassembly, wasm, wat, wast, assembly, browser, cpu, cpu-emulator, 8bit, emulation">
+  </head>
+  <body style="margin: 0;">
+    <canvas id="canvas" style="width: 100vw; height: 100vh; display: block;" ></canvas>
+    <script type="module" async>
+      "use strict";
+      (async () => {
+        const imports = {
+          env: {
+          }
+        }
+        
+        WebAssembly.instantiateStreaming(fetch('./pkg/z80.wasm'), imports)
+        .then(wasm => wasm.instance.exports.main());
+      })();
+    </script>
+  </body>
+</html>
