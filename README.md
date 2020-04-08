@@ -5,7 +5,7 @@
   <img src="" alt="Logo">
 
   <p>
-    <strong>a Z80 Emulator Directly in WebAssembly.</strong>
+    <strong>Z80 Emulator Directly in WebAssembly.</strong>
   </p>
 
   <p>
