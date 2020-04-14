@@ -1,6 +1,6 @@
 <div align="center">
 
-  <h1><code>ZedAssembly</code></h1>
+  <h1><code>EXACT</code></h1>
 
   <img src="" alt="Logo">
 
@@ -9,21 +9,21 @@
   </p>
 
   <p>
-    <a href="https://github.com/VioletVillain/ZedAssembly/actions"><img alt="GitHub Actions CI status" src="https://github.com/VioletVillain/ZedAssembly/workflows/ZedAssembly/badge.svg"></a>
+    <a href="https://github.com/VioletVillain/EXACT/actions"><img alt="GitHub Actions CI status" src="https://github.com/VioletVillain/EXACT/workflows/EXACT/badge.svg"></a>
   </p>
 
   <h3>
-    <a href="https://VioletVillain.github.io/ZedAssembly/">Website</a>
+    <a href="https://VioletVillain.github.io/EXACT/">Website</a>
     <span> | </span>
-    <a href="https://github.com/VioletVillain/ZedAssembly/wiki">Wiki</a>
+    <a href="https://github.com/VioletVillain/EXACT/wiki">Wiki</a>
     <span> | </span>
-    <a href="https://github.com/VioletVillain/ZedAssembly/issues">Forums</a>
+    <a href="https://github.com/VioletVillain/EXACT/issues">Forums</a>
     <span> | </span>
-    <a href="https://github.com/VioletVillain/ZedAssembly/actions">CI</a>
+    <a href="https://github.com/VioletVillain/EXACT/actions">CI</a>
     <span> | </span>
-    <a href="https://github.com/VioletVillain/ZedAssembly/projects">Roadmap</a>
+    <a href="https://github.com/VioletVillain/EXACT/projects">Roadmap</a>
     <span> | </span>
-    <a href="https://github.com/VioletVillain/ZedAssembly/releases">Releases</a>
+    <a href="https://github.com/VioletVillain/EXACT/releases">Releases</a>
   </h3>
   
 </div>
