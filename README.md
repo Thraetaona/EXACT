@@ -5,7 +5,7 @@
   <img src="" alt="Logo">
 
   <p>
-    <strong>Z80 Emulator Directly in WebAssembly.</strong>
+    <strong>Graphical Intel iAPX 86/10 Emulator Written In Pure WebAssembly.</strong>
   </p>
 
   <p>
