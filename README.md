@@ -31,4 +31,4 @@
 ***
 
 ## Introduction
-EXACT: **E**mulating **X**86 **A**ssembly **C**ore on Ne**T**.
+EXACT: **E**mulating **X**86 i**A**PX **C**PU on Ne**T**.
