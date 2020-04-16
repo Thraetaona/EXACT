@@ -2,25 +2,24 @@
 <html lang="en">
   <head>
     <meta charset="UTF-8">
-    <title>ZedAssembly</title>
-    <meta name="title" content="ZedAssembly">
+    <title>EXACT</title>
+    <meta name="title" content="EXACT">
     <meta name="author" content="Fereydoun Memarzanjany">
-    <meta name="description" content="Z80 Emulator Directly in WebAssembly.">
-    <meta name="keywords" content="zilog, z80, emulator, webassembly, wasm, wat, wast, assembly, browser, cpu, cpu-emulator, 8bit, emulation">
+    <meta name="description" content="Graphical Intel iAPX 86/10 Emulator Written In Pure WebAssembly.">
+    <meta name="keywords" content="intel, 8086, iapx, emulator, webassembly, wasm, wat, wast, assembly, browser, cpu, cpu-emulator, 16bit, emulation, graphical">
   </head>
   <body style="margin: 0;">
-    <canvas id="canvas" style="width: 100vw; height: 100vh; display: block;" ></canvas>
+    <canvas id="canvas" width="640" height="480" style="width: 100vw; height: 100vh; display: block;" ></canvas>
     <script type="module" async>
       "use strict";
       (async () => {
         const imports = {
           env: {
-            // Maximum accessible memory (initial) by a Z80 equals to '0.9765625' WASM memory pages or 64KB.
-            memory: new WebAssembly.Memory({initial: 1, maximum: 16384, shared: true}),
+            memory: new WebAssembly.Memory({initial: 16, maximum: 16384, shared: true}),
           }
         }
         
-        WebAssembly.instantiateStreaming(fetch('./Z80.wasm'), imports)
+        WebAssembly.instantiateStreaming(fetch('./8086.wasm'), imports)
         .then(wasm => wasm.instance.exports.start());
       })();
     </script>
