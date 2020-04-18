@@ -10,57 +10,59 @@
   ;; just as a real, physical 8086 would.
 
 
+
   (; Import Section ;)
   (import "env" "memory" (memory 16 16384 shared))
+
 
 
   (; Export Section ;)
   (export "start" (func $start))
 
 
+
   (; Global Section ;)
-  ;; 16-bit register decodes
-  ;; General Purpose Registers
-  (global $AX (mut i32) (i32.const 0))
-  (global $CX (mut i32) (i32.const 1))
-  (global $DX (mut i32) (i32.const 2))
-  (global $BX (mut i32) (i32.const 3))
+  ;; 16-bit General Purpose Registers (Divided into High / low)
+  (global $AX (mut i32) (i32.const 0)) ;; Accumulator (divided into AH / AL)
+  (global $CX (mut i32) (i32.const 1)) ;; Count (divided into CH / CL)
+  (global $DX (mut i32) (i32.const 2)) ;; Data (divided into DH / DL)
+  (global $BX (mut i32) (i32.const 3)) ;; Base address (divided into BH / BL)
+
+  ;; 8-bit decoded registers
+  (global $AL (mut i32) (i32.const 0)) ;; Accumulator low
+  (global $AH (mut i32) (i32.const 1)) ;; Accumulator High
+  (global $CL (mut i32) (i32.const 2)) ;; Count low
+  (global $CH (mut i32) (i32.const 3)) ;; Count High
+  (global $DL (mut i32) (i32.const 4)) ;; Data low
+  (global $DH (mut i32) (i32.const 5)) ;; Data High
+  (global $BL (mut i32) (i32.const 6)) ;; Base address low
+  (global $BH (mut i32) (i32.const 7)) ;; Base address high
 
   ;; Index Registers 
-  (global $SP (mut i32) (i32.const 4))
-  (global $BP (mut i32) (i32.const 5))
-  (global $SI (mut i32) (i32.const 6))
-  (global $DI (mut i32) (i32.const 7))
+  (global $SP (mut i32) (i32.const 4)) ;; Stack pointer 
+  (global $BP (mut i32) (i32.const 5)) ;; Base pointer 
+  (global $SI (mut i32) (i32.const 6)) ;; Source index
+  (global $DI (mut i32) (i32.const 7)) ;; Destination index
 
   ;; Segment Registers 
-  (global $ES (mut i32) (i32.const 8))
-  (global $CS (mut i32) (i32.const 9))
-  (global $SS (mut i32) (i32.const 10))
-  (global $DS (mut i32) (i32.const 11))
+  (global $ES (mut i32) (i32.const 8)) ;; Extra segment
+  (global $CS (mut i32) (i32.const 9)) ;; Code segment
+  (global $SS (mut i32) (i32.const 10)) ;; Stack segment
+  (global $DS (mut i32) (i32.const 11)) ;; Data segment
 
-  (global $ZERO i32 (i32.const 12))
-  (global $SCRATCH i32 (i32.const 13))
-
-  ;; 8-bit register decodes
-  (global $AL (mut i32) (i32.const 0))
-  (global $AH (mut i32) (i32.const 1))
-  (global $CL (mut i32) (i32.const 2))
-  (global $CH (mut i32) (i32.const 3))
-  (global $DL (mut i32) (i32.const 4))
-  (global $DH (mut i32) (i32.const 5))
-  (global $BL (mut i32) (i32.const 6))
-  (global $BH (mut i32) (i32.const 7))
+  ;;(global $ZERO i32 (i32.const 12))
+  ;;(global $SCRATCH i32 (i32.const 13))
 
   ;; Flag Registers
-  (global $CF (mut i32) (i32.const 40))
-  (global $PF (mut i32) (i32.const 41))
-  (global $AF (mut i32) (i32.const 42))
-  (global $ZF (mut i32) (i32.const 43))
-  (global $SF (mut i32) (i32.const 44))
-  (global $TF (mut i32) (i32.const 45))
-  (global $IF (mut i32) (i32.const 46))
-  (global $DF (mut i32) (i32.const 47))
-  (global $OF (mut i32) (i32.const 48))
+  (global $CF (mut i32) (i32.const 40)) ;; Carry flag
+  (global $PF (mut i32) (i32.const 41)) ;; Parity flag
+  (global $AF (mut i32) (i32.const 42)) ;; Auxiliary flag
+  (global $ZF (mut i32) (i32.const 43)) ;; Zero flag
+  (global $SF (mut i32) (i32.const 44)) ;; Sign flag
+  (global $TF (mut i32) (i32.const 45)) ;; Trap flag
+  (global $IF (mut i32) (i32.const 46)) ;; Interrupt enable flag
+  (global $DF (mut i32) (i32.const 47)) ;; Direction flag
+  (global $OF (mut i32) (i32.const 48)) ;; Overflow flag
 
   ;; Lookup tables in the BIOS binary
   (global $XLAT_OPCODE i32 (i32.const 8))
@@ -80,6 +82,7 @@
   (global $UPDATE_SZP i32 (i32.const 1))
   (global $UPDATE_AO_ARITH i32 (i32.const 2))
   (global $UPDATE_OC_LOGIC i32 (i32.const 4))
+
 
 
   (; Table Section ;)
@@ -104,6 +107,7 @@
   )
 
 
+
   (; Start Section ;)
   (func $start
   
@@ -116,21 +120,39 @@
   )
   
 
+
   (; Code Section ;)
+
+  (; Opcode backends ;)
 
   (; Opcodes ;)
   (func $0x00 (; ADD ;)
     ;; work-in-progress
   )
-
+  (func $0x01 (; ADD ;)
+    ;; work-in-progress
+  )
+  (func $0x02 (; ADD ;)
+    ;; work-in-progress
+  )
+  (func $0x03 (; ADD ;)
+    ;; work-in-progress
+  )
+  (func $0x04 (; ADD ;)
+    ;; work-in-progress
+  )
+  (func $0x05 (; ADD ;)
+    ;; work-in-progress
+  )
+  
   (func $0x90 (; NOP ;)
     nop
   )
 
   (; Undocumented or duplicate opcodes ;)
-  ;; Most illegal opcodes would just map to other documented instructions (e.g. 0x60 - 0x6f --> 0x70 – 0x7F);
+  ;; Most illegal opcodes would just map to other documented instructions (e.g. 60h - 6fh --> 70h – 7Fh);
   ;; while a few others such as 'SALC' actually did something useful.
-  ;; However, a real 8086 (or anything earlier than 80186) would do nothing when encountering a truly invalid opcode.
+  ;; However, a real 8086 (or anything earlier than 80186) would do nothing when encountering a truly invalid opcode (hence the nop).
   ;; This emulator aims to be fully compatible with the original 8086, so it supports the redundant opcodes or others like 'SALC'.
   (func $UD (; illegal instruction ;)
     nop
