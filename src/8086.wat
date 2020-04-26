@@ -24,68 +24,48 @@
   (; Global Section ;)
   ;; 16-bit General Purpose Registers (Divided into High / low)
   (global $AX (mut i32) (i32.const 0)) ;; Accumulator (divided into AH / AL)
-  (global $CX (mut i32) (i32.const 1)) ;; Count (divided into CH / CL)
-  (global $DX (mut i32) (i32.const 2)) ;; Data (divided into DH / DL)
-  (global $BX (mut i32) (i32.const 3)) ;; Base address (divided into BH / BL)
+  (global $CX (mut i32) (i32.const 0)) ;; Count (divided into CH / CL)
+  (global $DX (mut i32) (i32.const 0)) ;; Data (divided into DH / DL)
+  (global $BX (mut i32) (i32.const 0)) ;; Base address (divided into BH / BL)
 
   ;; 8-bit decoded registers
   (global $AL (mut i32) (i32.const 0)) ;; Accumulator low
-  (global $AH (mut i32) (i32.const 1)) ;; Accumulator High
-  (global $CL (mut i32) (i32.const 2)) ;; Count low
-  (global $CH (mut i32) (i32.const 3)) ;; Count High
-  (global $DL (mut i32) (i32.const 4)) ;; Data low
-  (global $DH (mut i32) (i32.const 5)) ;; Data High
-  (global $BL (mut i32) (i32.const 6)) ;; Base address low
-  (global $BH (mut i32) (i32.const 7)) ;; Base address high
+  (global $AH (mut i32) (i32.const 0)) ;; Accumulator High
+  (global $CL (mut i32) (i32.const 0)) ;; Count low
+  (global $CH (mut i32) (i32.const 0)) ;; Count High
+  (global $DL (mut i32) (i32.const 0)) ;; Data low
+  (global $DH (mut i32) (i32.const 0)) ;; Data High
+  (global $BL (mut i32) (i32.const 0)) ;; Base address low
+  (global $BH (mut i32) (i32.const 0)) ;; Base address high
+
 
   ;; Index Registers 
-  (global $SP (mut i32) (i32.const 4)) ;; Stack pointer 
-  (global $BP (mut i32) (i32.const 5)) ;; Base pointer 
-  (global $SI (mut i32) (i32.const 6)) ;; Source index
-  (global $DI (mut i32) (i32.const 7)) ;; Destination index
+  (global $SP (mut i32) (i32.const 0)) ;; Stack pointer 
+  (global $BP (mut i32) (i32.const 0)) ;; Base pointer 
+  (global $SI (mut i32) (i32.const 0)) ;; Source index
+  (global $DI (mut i32) (i32.const 0)) ;; Destination index
 
   ;; Segment Registers 
-  (global $ES (mut i32) (i32.const 8)) ;; Extra segment
-  (global $CS (mut i32) (i32.const 9)) ;; Code segment
-  (global $SS (mut i32) (i32.const 10)) ;; Stack segment
-  (global $DS (mut i32) (i32.const 11)) ;; Data segment
-
-  ;;(global $ZERO i32 (i32.const 12))
-  ;;(global $SCRATCH i32 (i32.const 13))
+  (global $ES (mut i32) (i32.const 0)) ;; Extra segment
+  (global $CS (mut i32) (i32.const 0)) ;; Code segment
+  (global $SS (mut i32) (i32.const 0)) ;; Stack segment
+  (global $DS (mut i32) (i32.const 0)) ;; Data segment
 
   ;; Flag Registers
-  (global $CF (mut i32) (i32.const 40)) ;; Carry flag
-  (global $PF (mut i32) (i32.const 41)) ;; Parity flag
-  (global $AF (mut i32) (i32.const 42)) ;; Auxiliary flag
-  (global $ZF (mut i32) (i32.const 43)) ;; Zero flag
-  (global $SF (mut i32) (i32.const 44)) ;; Sign flag
-  (global $TF (mut i32) (i32.const 45)) ;; Trap flag
-  (global $IF (mut i32) (i32.const 46)) ;; Interrupt enable flag
-  (global $DF (mut i32) (i32.const 47)) ;; Direction flag
-  (global $OF (mut i32) (i32.const 48)) ;; Overflow flag
-
-  ;; Lookup tables in the BIOS binary
-  (global $XLAT_OPCODE i32 (i32.const 8))
-  (global $XLAT_SUBFUNCTION i32 (i32.const 9))
-  (global $STD_FLAGS i32 (i32.const 10))
-  (global $PARITY_FLAG i32 (i32.const 11))
-  (global $BASE_INST_SIZE i32 (i32.const 12))
-  (global $I_W_SIZE i32 (i32.const 13))
-  (global $I_MOD_SIZE i32 (i32.const 14))
-  (global $COND_JUMP_DECODE_A i32 (i32.const 15))
-  (global $COND_JUMP_DECODE_B i32 (i32.const 16))
-  (global $COND_JUMP_DECODE_C i32 (i32.const 17))
-  (global $COND_JUMP_DECODE_D i32 (i32.const 18))
-  (global $BITFIELDS i32 (i32.const 19))
-
-  ;; Bitfields for TABLE_STD_FLAGS values
-  (global $UPDATE_SZP i32 (i32.const 1))
-  (global $UPDATE_AO_ARITH i32 (i32.const 2))
-  (global $UPDATE_OC_LOGIC i32 (i32.const 4))
+  (global $CF (mut i32) (i32.const 0)) ;; Carry flag
+  (global $PF (mut i32) (i32.const 0)) ;; Parity flag
+  (global $AF (mut i32) (i32.const 0)) ;; Auxiliary flag
+  (global $ZF (mut i32) (i32.const 0)) ;; Zero flag
+  (global $SF (mut i32) (i32.const 0)) ;; Sign flag
+  (global $TF (mut i32) (i32.const 0)) ;; Trap flag
+  (global $IF (mut i32) (i32.const 0)) ;; Interrupt enable flag
+  (global $DF (mut i32) (i32.const 0)) ;; Direction flag
+  (global $OF (mut i32) (i32.const 0)) ;; Overflow flag
 
 
-
+(;
   (; Table Section ;)
+  ;; lookup table for dynamic dispatch of opcodes readen from hex code.
   (table $opcodes 256 256 funcref) (elem (i32.const 0) 
     (;  0     1     2     3     4     5     6     7     8     9     A     B     C     D     E     F    / ;)
     $0x00 $0x01 $0x02 $0x03 $0x04 $0x05 $0x06 $0x07 $0x08 $0x09 $0x0a $0x0b $0x0c $0x0d $0x0e $0x0f (; 0 ;)
@@ -105,7 +85,7 @@
     $0xe0 $0xe1 $0xe2 $0xe3 $0xe4 $0xe5 $0xe6 $0xe7 $0xe8 $0xe9 $0xea $0xeb $0xec $0xed $0xee $0xef (; E ;)
     $0xf0 $0xf1 $0xf2 $0xf3 $0xf4 $0xf5 $0xf6 $0xf7 $0xf8 $0xf9 $0xfa $0xfb $0xfc $0xfd $0xfe $0xff (; F ;)
   )
-
+;)
 
 
   (; Start Section ;)
@@ -124,6 +104,21 @@
   (; Code Section ;)
 
   (; Opcode backends ;)
+  ;; adds a value (+ an optional carry flag) to a register
+  (func $ADD (param $destination i32) (param $source i32)
+    ;;local.get $s
+    ;;local.get $s
+    ;;i32.add
+  )
+(;
+  static inline void i8080_add(i8080* const c, uint8_t* const reg, uint8_t val, bool cy) {
+    const uint8_t result = *reg + val + cy;
+    c->cf = carry(8, *reg, val, cy);
+    c->hf = carry(4, *reg, val, cy);
+    SET_ZSP(c, result);
+    *reg = result;
+  }
+;)
 
   (; Opcodes ;)
   (func $0x00 (; ADD ;)
@@ -150,10 +145,12 @@
   )
 
   (; Undocumented or duplicate opcodes ;)
-  ;; Most illegal opcodes would just map to other documented instructions (e.g. 60h - 6fh --> 70h – 7Fh);
+  ;; Most illegal opcodes would just map to other documented instructions (e.g. 0x60 - 0x6f ==> 0x70 – 0x7f);
   ;; while a few others such as 'SALC' actually did something useful.
   ;; However, a real 8086 (or anything earlier than 80186) would do nothing when encountering a truly invalid opcode (hence the nop).
   ;; This emulator aims to be fully compatible with the original 8086, so it supports the redundant opcodes or others like 'SALC'.
+  ;; Also, 0xd8 - 0xdf are only valid when a co-processor (e.g x87) is present; but since we are emulating this on fast, modern hardware,
+  ;; and co-processors were very rare and expensive back then; emulating a 8087 is out of this project's scope, and therefore invalid.
   (func $UD (; illegal instruction ;)
     nop
   )
