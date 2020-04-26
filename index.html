@@ -1,0 +1,47 @@
+<!DOCTYPE html>
+
+<html lang="en">
+  <head>
+    <meta charset="UTF-8">
+    <title>EXACT</title>
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <meta name="title" content="EXACT">
+    <meta name="author" content="Fereydoun Memarzanjany">
+    <meta name="description" content="Graphical Intel iAPX 86/10 Emulator Written In Pure WebAssembly.">
+    <meta name="keywords" content="intel, 8086, iapx, emulator, webassembly, wasm, wat, wast, assembly, browser, cpu, cpu-emulator, 16bit, emulation, graphical">
+    <link rel="stylesheet" type="text/css" href="stylesheet.css" />
+  </head>
+
+
+  <body>
+    <h1><code>EXACT</code></h1>
+    <p>
+      <strong>Graphical Intel iAPX 86/10 Emulator Written In Pure WebAssembly.</strong>
+    </p>
+    
+    <span class="label">ROM:</span>
+    <label class="button"><input type="file" id="upload" />Upload</label>
+
+    <canvas id="screen" width="640" height="480" ></canvas>
+
+    <div class="container">
+      <div class="memory"></div>
+      <div class="registers"></div>
+    </div>
+
+
+    <script type="module" async>
+      "use strict";
+      (async () => {
+        const imports = {
+          env: {
+            memory: new WebAssembly.Memory({initial: 16, maximum: 16384, shared: true}),
+          }
+        }
+        
+        WebAssembly.instantiateStreaming(fetch('./8086.wasm'), imports)
+        .then(wasm => wasm.instance.exports.start());
+      })();
+    </script>
+  </body>
+</html>
