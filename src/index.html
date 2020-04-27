@@ -35,11 +35,11 @@
       (async () => {
         const imports = {
           env: {
-            memory: new WebAssembly.Memory({initial: 16, maximum: 16384, shared: true}),
+            memory: new WebAssembly.Memory({initial: 16, maximum: 16384, shared: false}),
           }
         }
         
-        WebAssembly.instantiateStreaming(fetch('./8086.wasm'), imports)
+        WebAssembly.instantiateStreaming(fetch('./emulator/8086.wasm'), imports)
         .then(wasm => wasm.instance.exports.start());
       })();
     </script>
