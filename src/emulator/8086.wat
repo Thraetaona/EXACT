@@ -113,104 +113,48 @@
    ;)
   (func $start
   
-    block
+    
       nop
       (i32.add (i32.const 1) (i32.const 2))
       drop
-    end
+    
 
   )
-  
+
 
 
   (; 
    ; Code Section
    ;)
   (; Helper functions ;)
-  ;; Sets (status) flag registers accordingly to the resulting value from math operations, 'consuming' the said value in process.
+  ;; Sets Zero/Sign/Parity flags accordingly to the resulting value from math operations, 'consuming' the said value in process.
   (func $set_zsp (param $value i32)
     ;; If the value equals 0 then ZF is set to 1; 0 otherwise.
-    block (; Zero ;)
-      i32.const 0 i32.const 1
-      local.get $value
-      select
-    end
+    (select (i32.const 0) (block (result i32) i32.const 0 global.set $SF i32.const 1 global.set $PF i32.const 1 global.set $ZF return)
+            (local.get $value)) ;; For 0, we return early; setting other flags appropriately.
     global.set $ZF
-
+    
     ;; If the high-order bit of the value is a 1 then SF is set to 1; 0 otherwise. (Two's complement notation)
-    block (; Sign ;)
-      local.get $value
-      i32.const 15
-      i32.shr_u
-    end
+    (i32.shr_u (local.get $value) (i32.const 15))
     global.set $SF
 
     ;; If the value has even parity (an even number of 1-bits) PF is set to 1, 0 otherwise.
-    ;;
-    ;; This works in parallel as it operates on many bits at once;
-    ;; in a high level language it would look like this:
-    ;;  [ ^  for bitwise XOR         ]
-    ;;  [ >> for logical right shift ]
-    ;;  [ &  for bitwise AND         ]
-    ;;  ...
-    ;;  x = x ^ (x >> 8)
-    ;;  x = x ^ (x >> 4)
-    ;;  x = x ^ (x >> 2)
-    ;;  x = x ^ (x >> 1)
-    ;;  PF = x & 1
-    ;;  ...
-    ;; Notice that "x" is the only local variable, so it actually 'writes' the result to itself,
-    ;; hence the use of 'local.tee'; 'local.tee' works just like 'local.set', except that it
-    ;; also returns ('local.get') the value after setting it.  
-    block (; Parity ;)
-      block 
-        block
-          local.get $value 
-          i32.const 8
-          i32.shr_u
-        end
-        local.get $value
-        i32.xor
-      end
-      block
-        block
-          local.tee $value
-          i32.const 4
-          i32.shr_u
-        end
-        local.get $value
-        i32.xor
-      end
-      block
-        block
-          local.tee $value
-          i32.const 2
-          i32.shr_u
-        end
-        local.get $value
-        i32.xor
-      end
-      block
-        block
-          local.tee $value
-          i32.const 1
-          i32.shr_u
-        end
-        local.get $value
-        i32.xor
-      end
-      i32.const 1
-      i32.and
-    end
+    (i32.xor
+      (i32.rem_u
+        (i32.popcnt (local.get $value))
+        (i32.const 2)
+      )
+      (i32.const -1)
+    )
     global.set $PF
   )
   
-  (func $set_aoc
+  ;; Sets Auxiliary/Overflow/Carry flags just like above.
+  (func $set_aoc (param $value i32)
     ;; if the result of a signed operation is too large to be represented in 8-bits, Then OF is set to 1, 0 otherwise.
-    block (; Overflow ;)
       
-    end
-    global.set $OF
+    
+    ;;global.set $OF
   )
 
 
@@ -223,8 +167,8 @@
     global.get $CF
     i32.add
     ;; TODO: push the above value to stack again and use set_aoc.
-    call $set_zsp
-    return
+    ;;call $set_zsp
+    ;;return
     ;; It's not possible to pass global variables as function arguments,
     ;; so this function simply returns the resulting number and sets arithmeticaal flags accordingly.  
     ;; setting destination to the said value is done in opcodes.
@@ -232,35 +176,35 @@
 
 
   (; Opcodes ;)
-  (func $0x00 (; ADD ;)
+  (func $0x00 (; ADD ;) (;
     i32.const 0
     call $ADD
-    global.set $
+    global.set $ ;)
   )
-  (func $0x01 (; ADD ;)
+  (func $0x01 (; ADD ;) (;
     i32.const 0
     call $ADD
-    global.set $
+    global.set $ ;)
   )
-  (func $0x02 (; ADD ;)
+  (func $0x02 (; ADD ;) (;
     i32.const 0
     call $ADD
-    global.set $
+    global.set $ ;)
   )
-  (func $0x03 (; ADD ;)
+  (func $0x03 (; ADD ;) (;
     i32.const 0
     call $ADD
-    global.set $
+    global.set $ ;)
   )
-  (func $0x04 (; ADD ;)
+  (func $0x04 (; ADD ;) (;
     i32.const 0
     call $ADD
-    global.set $
+    global.set $AL ;)
   )
-  (func $0x05 (; ADD ;)
+  (func $0x05 (; ADD ;) (;
     i32.const 0
     call $ADD
-    global.set $
+    global.set $AX ;)
   )
   
   (func $0x06 (; PUSH ES ;)
@@ -293,13 +237,17 @@
     ;; work-in-progress
   )
 
+  (func $0x90 (; NOP ;)
+    nop
+  )
+
 
   (; Undocumented or duplicate opcodes ;)
   ;; Most illegal opcodes would just map to other documented instructions (e.g. 0x60 - 0x6f ==> 0x70 – 0x7f);
   ;; while a few others such as 'SALC' actually did something useful.
   ;;
   ;; However, a real 8086 (or anything earlier than 80186) would do nothing when encountering a truly invalid opcode (hence the nop).
-  ;; This emulator aims to be fully compatible only (i.e. no co-processors) with the original 8086, so it supports the 
+  ;; This emulator aims to be FULLY compatible only (i.e. no co-processors) with the original 8086, so it supports the 
   ;; redundant opcodes or others like 'SALC'.  Also, several opcodes (e.g. 0xd8 - 0xdf) are only valid when a co-processor like x87 is present; 
   ;; but since we are emulating this on fast, modern hardware, and co-processors were very rare and expensive back then; 
   ;; emulating a 8087 is out of this project's scope, and therefore invalid.
@@ -313,11 +261,8 @@
 
   ;; this opcode sets AL to 256 if the carry flag is set, 0 otherwise.
   (func $0xd6 (; SALC ;)
-    block
-      i32.const 0xFF i32.const 0x00
-      global.get $CF
-      select
-    end
+    (select (i32.const 0xFF) (i32.const 0x00)
+            (global.get $CF))
     global.set $AL
   )
 
