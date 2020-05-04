@@ -13,11 +13,9 @@
 
 
 body {
-  margin-left: auto;
-  margin-right: auto;
   background-color: var(--theme-color);
-  text-align: center !important;
   color: var(--text-color);
+  text-align: center !important;
 }
 
 
@@ -36,6 +34,14 @@ p {
 .label {
   font-size: 1.5em;
 }
+small {
+  font-size: 1.2em;
+}
+
+#vr {
+  margin: 0 0;
+  border: 1px solid var(--accent-color);
+}
 
 
 #screen {
@@ -47,29 +53,32 @@ p {
 }
 
 
-.container{
+.container {
+  margin: auto;
   display: flex;
-  flex-direction: row;
+  justify-content: center;
 }
 
-.memory {
-  height: 512px;
-  width: 312px;
-  /*overflow-y: scroll;*/
-  padding: 5px;
+fieldset {
+  width: 25vw;
+  height: 25vh;
+  border: 2px solid var(--accent-color);
+  column-count: 3;
+  column-gap: 40px;
+  column-rule: 1px solid var(--accent-color);
+  text-align: justify;
 }
-
-.registers {
-  height: 512px;
-  width: 100px;
-  padding: 5px;
+legend {
+  font-family: Georgia;
+  font-weight: bold;
+  text-align: center;
 }
 
 
 .button {
   background-color: var(--accent-color);
   border: none;
-  color: white;
+  color: var(--text-color);
   padding: 15px 32px;
   text-align: center;
   text-decoration: none;
