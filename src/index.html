@@ -1,5 +1,4 @@
 <!DOCTYPE html>
-
 <html lang="en">
   <head>
     <meta charset="UTF-8">
@@ -13,27 +12,32 @@
   </head>
 
 
+
   <body>
     <h1><code>EXACT</code></h1>
     <p>
       <strong><b>E</b>mulating <b>X</b>86 i<b>A</b>PX <b>C</b>PU on Ne<b>T</b></strong>
     </p>
     
+
     <section class="container">
-      <small>Choose from the examples <br> or upload you'r own</small>
-      <hr id="vr">
       <span class="label">Program:</span>
       <select class="button" id="examples">
+        <option selected disabled>Examples</option>
       </select>
-      <label class="button"><input type="file" id="upload" />Upload</label>
+      
+      <label class="button"><input type="file" id="upload" />Upload you'r own</label>
     </section>
+
     <section class="container">
       <button class="button" id='run'>Execute</button>
       <button class="button" id='step'>Step</button>
       <button class="button" id='stop'>Halt</button>
     </section>
 
+
     <canvas id="screen" width="640" height="480" ></canvas>
+
 
     <section class="container">
       <fieldset id="registers"> <legend>Registers:</legend>
@@ -78,6 +82,8 @@
 
     <script type="module" async>
       "use strict";
+      import updateUI from './util/gui.js';
+
       (async () => {
         const imports = {
           env: {
@@ -85,8 +91,11 @@
           }
         }
         
-        WebAssembly.instantiateStreaming(fetch('./emulator/8086.wasm'), imports)
-        .then(wasm => wasm.instance.exports.start());
+        const { instance } = await WebAssembly.instantiateStreaming(fetch('./emulator/8086.wasm'), imports);
+
+        instance.exports.start();
+
+        await updateUI(memory);
       })();
     </script>
   </body>

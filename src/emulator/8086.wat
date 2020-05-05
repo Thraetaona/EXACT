@@ -6,9 +6,9 @@
   (; 
    ; Memory Section
    ;)
-  ;; It is possible to define memory within webassembly like this "(memory 1 16384 shared)",
+  ;; It is possible to define the memory within webassembly like this "(memory 1 16384 shared)",
   ;; however, we currently define it in the host environment and simply export it to this module.
-  ;; Where it's defined has no effect on performance, it is purely done to keep the emulator 'modular'
+  ;; Where it's defined has no effect on performance, it is purely done to keep the emulator 'modular',
   ;; in a way that it expects memory, basic IO and other components to be provided externally;
   ;; just as a real, physical 8086 would.
 
@@ -25,13 +25,14 @@
    ; Export Section
    ;)
   (export "start" (func $start))
+  ;;(export "registers.get" (func $registers.get)) ;;
 
 
 
   (; 
    ; Global Section
    ;)
-  (; These are instantiation-time immutable variables, similar to #define 'regName' 'bitNum' in C, solely for convenience.     ;
+  (; These are instantiation-time global constants, similar to #define 'regName' 'bitNum' in C, solely for convenience.     ;
    ; They are accessed through $registers.set/get interfaces; to ensure efficient and reliable emulation of decoded registers. ;)
   ;; 16-Bit General Purpose Registers (Divided into High / low)
   (global $AX i32 (i32.const 0)) ;; Accumulator (divided into AH / AL)
@@ -114,11 +115,9 @@
    ;)
   (func $start
   
-    
-      nop
-      (i32.add (i32.const 1) (i32.const 2))
-      drop
-    
+  (call $registers.set16 (global.get $AX) (i32.const 404))
+  (call $registers.set16 (global.get $BX) (i32.const 2))
+  (call $registers.set16 (global.get $CX) (i32.const 51))
 
   )
 
@@ -131,17 +130,17 @@
   ;; Stores a 16-Bit value in a general-purpose register.
   (func $registers.set16 (param $bit i32) (param $value i32)
     (i32.store16 offset=2 ;; The offset is to make sure that the 16-Bit registers are not overlapping.
-      (i32.rem_u ;; Conditional validation to ensure that the bit is 0 to 7.
+      (i32.rem_u ;; validation to ensure that the bit is 0 to 7.
         (local.get $bit)
         (i32.const 8)
       )
       (local.get $value)
     )
   )
-  ;; Retrieves any value from a general-purpose register.
-  ;;(func $registers.get (param $bit i32) (result i32)
-
-  ;;)
+  ;; Retrieves a previously stored value from the specified register.
+  (func $registers.get (param $bit i32) (result i32)
+    (i32.load16_s (local.get $bit))
+  )
 
   ;; TODO:
   (;func $ (param $address i32) (param $value i32)
