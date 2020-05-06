@@ -1,5 +1,4 @@
 <!DOCTYPE html>
-
 <html lang="en">
   <head>
     <meta charset="UTF-8">
@@ -13,34 +12,91 @@
   </head>
 
 
+
   <body>
     <h1><code>EXACT</code></h1>
     <p>
-      <strong>Graphical Intel iAPX 86/10 Emulator Written In Pure WebAssembly.</strong>
+      <strong><b>E</b>mulating <b>X</b>86 i<b>A</b>PX <b>C</b>PU on Ne<b>T</b></strong>
     </p>
     
-    <span class="label">ROM:</span>
-    <label class="button"><input type="file" id="upload" />Upload</label>
+
+    <section class="container">
+      <span class="label" for="examples">Program:</span>
+      <select class="button" id="examples">
+        <option selected disabled>Examples</option>
+      </select>
+      
+      <label class="button"><input type="file" id="upload" />Choose you'r own</label>
+    </section>
+
+    <section class="container">
+      <button class="button" id='run'>Execute</button>
+      <button class="button" id='step'>Step</button>
+      <button class="button" id='stop'>Halt</button>
+    </section>
+
 
     <canvas id="screen" width="640" height="480" ></canvas>
 
-    <div class="container">
-      <div class="memory"></div>
-      <div class="registers"></div>
-    </div>
+
+    <section class="container">
+      <section id="registers">
+        AX: <var class="register" id="AX">0</var> <br>
+        CX: <var class="register" id="CX">0</var> <br>
+        DX: <var class="register" id="DX">0</var> <br>
+        BX: <var class="register" id="BX">0</var> <br>
+        <br>
+        SP: <var class="register" id="SP">0</var> <br>
+        BP: <var class="register" id="BP">0</var> <br>
+        SI: <var class="register" id="SI">0</var> <br>
+        DI: <var class="register" id="DI">0</var> <br>
+        <br>
+        AL: <var class="register" id="AL">0</var> <br>
+        CL: <var class="register" id="CL">0</var> <br>
+        DL: <var class="register" id="DL">0</var> <br>
+        BL: <var class="register" id="BL">0</var> <br>
+        <br>
+        AH: <var class="register" id="AH">0</var> <br>
+        CH: <var class="register" id="CH">0</var> <br>
+        DH: <var class="register" id="DH">0</var> <br>
+        BH: <var class="register" id="BH">0</var> <br>
+        <br>
+        ES: <var class="register" id="ES">0</var> <br>
+        CS: <var class="register" id="CS">0</var> <br>
+        SS: <var class="register" id="SS">0</var> <br>
+        DS: <var class="register" id="DS">0</var> <br>
+        <br>
+        CF: <var class="register" id="CF">0</var> <br>
+        PF: <var class="register" id="PF">0</var> <br>
+        AF: <var class="register" id="AF">0</var> <br>
+        OF: <var class="register" id="OF">0</var> <br>
+        ZF: <var class="register" id="ZF">0</var> <br>
+        SF: <var class="register" id="SF">0</var> <br>
+        TF: <var class="register" id="TF">0</var> <br>
+        IF: <var class="register" id="IF">0</var> <br>
+        DF: <var class="register" id="DF">0</var> <br>
+      </section>
+      <section id="memory">
+      </section>
+    </section>
 
 
     <script type="module" async>
       "use strict";
+      import updateUI from './util/ui.js';
+
       (async () => {
         const imports = {
           env: {
-            memory: new WebAssembly.Memory({initial: 16, maximum: 16384, shared: true}),
+            memory: new WebAssembly.Memory({initial: 16, maximum: 16384, shared: false}),
           }
         }
         
-        WebAssembly.instantiateStreaming(fetch('./8086.wasm'), imports)
-        .then(wasm => wasm.instance.exports.start());
+        const { instance } = await WebAssembly.instantiateStreaming(fetch('./emulator/8086.wasm'), imports);
+
+        instance.exports.start();
+
+        await updateUI(instance);
       })();
     </script>
   </body>
