@@ -21,12 +21,12 @@
     
 
     <section class="container">
-      <span class="label">Program:</span>
+      <span class="label" for="examples">Program:</span>
       <select class="button" id="examples">
         <option selected disabled>Examples</option>
       </select>
       
-      <label class="button"><input type="file" id="upload" />Upload you'r own</label>
+      <label class="button"><input type="file" id="upload" />Choose you'r own</label>
     </section>
 
     <section class="container">
@@ -40,49 +40,50 @@
 
 
     <section class="container">
-      <fieldset id="registers"> <legend>Registers:</legend>
-        AX: <var id="AX">0</var>
-        CX: <var id="CX">0</var>
-        DX: <var id="DX">0</var>
-        BX: <var id="BX">0</var>
+      <section id="registers">
+        AX: <var class="register" id="AX">0</var> <br>
+        CX: <var class="register" id="CX">0</var> <br>
+        DX: <var class="register" id="DX">0</var> <br>
+        BX: <var class="register" id="BX">0</var> <br>
         <br>
-        SP: <var id="SP">0</var>
-        BP: <var id="BP">0</var>
-        SI: <var id="SI">0</var>
-        DI: <var id="DI">0</var>
+        SP: <var class="register" id="SP">0</var> <br>
+        BP: <var class="register" id="BP">0</var> <br>
+        SI: <var class="register" id="SI">0</var> <br>
+        DI: <var class="register" id="DI">0</var> <br>
         <br>
-        AL: <var id="AL">0</var>
-        CL: <var id="CL">0</var>
-        DL: <var id="DL">0</var>
-        BL: <var id="BL">0</var>
-        AH: <var id="AH">0</var>
-        CH: <var id="CH">0</var>
-        DH: <var id="DH">0</var>
-        BH: <var id="BH">0</var>
+        AL: <var class="register" id="AL">0</var> <br>
+        CL: <var class="register" id="CL">0</var> <br>
+        DL: <var class="register" id="DL">0</var> <br>
+        BL: <var class="register" id="BL">0</var> <br>
         <br>
-        ES: <var id="ES">0</var>
-        CS: <var id="CS">0</var>
-        SS: <var id="SS">0</var>
-        DS: <var id="DS">0</var>
+        AH: <var class="register" id="AH">0</var> <br>
+        CH: <var class="register" id="CH">0</var> <br>
+        DH: <var class="register" id="DH">0</var> <br>
+        BH: <var class="register" id="BH">0</var> <br>
         <br>
-        CF: <var id="CF">0</var>
-        PF: <var id="PF">0</var>
-        AF: <var id="AF">0</var>
-        OF: <var id="OF">0</var>
-        ZF: <var id="ZF">0</var>
-        SF: <var id="SF">0</var>
-        TF: <var id="TF">0</var>
-        IF: <var id="IF">0</var>
-        DF: <var id="DF">0</var>
-      </fieldset>
-      <fieldset id="memory"> <legend>Memory:</legend>
-      </fieldset>
+        ES: <var class="register" id="ES">0</var> <br>
+        CS: <var class="register" id="CS">0</var> <br>
+        SS: <var class="register" id="SS">0</var> <br>
+        DS: <var class="register" id="DS">0</var> <br>
+        <br>
+        CF: <var class="register" id="CF">0</var> <br>
+        PF: <var class="register" id="PF">0</var> <br>
+        AF: <var class="register" id="AF">0</var> <br>
+        OF: <var class="register" id="OF">0</var> <br>
+        ZF: <var class="register" id="ZF">0</var> <br>
+        SF: <var class="register" id="SF">0</var> <br>
+        TF: <var class="register" id="TF">0</var> <br>
+        IF: <var class="register" id="IF">0</var> <br>
+        DF: <var class="register" id="DF">0</var> <br>
+      </section>
+      <section id="memory">
+      </section>
     </section>
 
 
     <script type="module" async>
       "use strict";
-      import updateUI from './util/gui.js';
+      import updateUI from './util/ui.js';
 
       (async () => {
         const imports = {
@@ -95,7 +96,7 @@
 
         instance.exports.start();
 
-        await updateUI(memory);
+        await updateUI(instance);
       })();
     </script>
   </body>

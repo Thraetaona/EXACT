@@ -49,16 +49,16 @@ p {
   margin: auto;
   display: flex;
   justify-content: center;
+  font-size: 1em;
 }
 
-fieldset {
-  width: 25vw;
-  height: 25vh;
+#registers {
+  padding: 1em;
+  margin: 4px 2px;
   border: 2px solid var(--accent-color);
   column-count: 3;
-  column-gap: 40px;
+  column-gap: 5em;
   column-rule: 1px solid var(--accent-color);
-  text-align: justify;
 }
 legend {
   font-family: Georgia;

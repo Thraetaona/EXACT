@@ -25,7 +25,7 @@
    ; Export Section
    ;)
   (export "start" (func $start))
-  ;;(export "registers.get" (func $registers.get)) ;;
+  (export "memory" (memory 0))
 
 
 
@@ -35,25 +35,25 @@
   (; These are instantiation-time global constants, similar to #define 'regName' 'bitNum' in C, solely for convenience.     ;
    ; They are accessed through $registers.set/get interfaces; to ensure efficient and reliable emulation of decoded registers. ;)
   ;; 16-Bit General Purpose Registers (Divided into High / low)
-  (global $AX i32 (i32.const 0)) ;; Accumulator (divided into AH / AL)
-  (global $CX i32 (i32.const 1)) ;; Count (divided into CH / CL)
-  (global $DX i32 (i32.const 2)) ;; Data (divided into DH / DL)
-  (global $BX i32 (i32.const 3)) ;; Base (divided into BH / BL)
+  (global $AX i32 (i32.const 0)) ;; 0; Accumulator (divided into AH / AL)
+  (global $CX i32 (i32.const 2)) ;; 1; Count (divided into CH / CL)
+  (global $DX i32 (i32.const 4)) ;; 2; Data (divided into DH / DL)
+  (global $BX i32 (i32.const 6)) ;; 3; Base (divided into BH / BL)
   ;; 16-Bit Index Registers 
-  (global $SP i32 (i32.const 4)) ;; Stack pointer 
-  (global $BP i32 (i32.const 5)) ;; Base pointer 
-  (global $SI i32 (i32.const 6)) ;; Source index
-  (global $DI i32 (i32.const 7)) ;; Destination index
+  (global $SP i32 (i32.const 8)) ;; 4; Stack pointer 
+  (global $BP i32 (i32.const 10)) ;; 5; Base pointer 
+  (global $SI i32 (i32.const 12)) ;; 6; Source index
+  (global $DI i32 (i32.const 14)) ;; 7; Destination index
 
   ;; 8-Bit decoded registers
-  (global $AL i32 (i32.const 0)) ;; Accumulator low
-  (global $CL i32 (i32.const 1)) ;; Count low
-  (global $DL i32 (i32.const 2)) ;; Data low
-  (global $BL i32 (i32.const 3)) ;; Base low
-  (global $AH i32 (i32.const 4)) ;; Accumulator High
-  (global $CH i32 (i32.const 5)) ;; Count High
-  (global $DH i32 (i32.const 6)) ;; Data High
-  (global $BH i32 (i32.const 7)) ;; Base high
+  (global $AL i32 (i32.const 0)) ;; 0; Accumulator low
+  (global $CL i32 (i32.const 1)) ;; 1; Count low
+  (global $DL i32 (i32.const 2)) ;; 2; Data low
+  (global $BL i32 (i32.const 3)) ;; 3; Base low
+  (global $AH i32 (i32.const 4)) ;; 4; Accumulator High
+  (global $CH i32 (i32.const 5)) ;; 5; Count High
+  (global $DH i32 (i32.const 6)) ;; 6; Data High
+  (global $BH i32 (i32.const 7)) ;; 7; Base high
 
   ;; Segment Registers 
   (global $ES i32 (i32.const 0)) ;; Extra segment
@@ -115,9 +115,13 @@
    ;)
   (func $start
   
-  (call $registers.set16 (global.get $AX) (i32.const 404))
-  (call $registers.set16 (global.get $BX) (i32.const 2))
-  (call $registers.set16 (global.get $CX) (i32.const 51))
+  (call $registers.set16 (global.get $AX) (i32.const 65535))
+
+  (call $registers.set16 (global.get $CX) (i32.const 24))
+  (call $registers.set16 (global.get $BX) (i32.const 55))
+
+  (call $registers.set16 (global.get $DI) (i32.const 24))
+  (call $registers.set16 (global.get $SI) (i32.const 404))
 
   )
 
@@ -129,7 +133,7 @@
   (; Helper functions ;)
   ;; Stores a 16-Bit value in a general-purpose register.
   (func $registers.set16 (param $bit i32) (param $value i32)
-    (i32.store16 offset=2 ;; The offset is to make sure that the 16-Bit registers are not overlapping.
+    (i32.store16 ;;offset=2 ;; The offset is to make sure that the 16-Bit registers are not overlapping.
       (i32.rem_u ;; validation to ensure that the bit is 0 to 7.
         (local.get $bit)
         (i32.const 8)
