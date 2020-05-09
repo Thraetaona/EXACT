@@ -36,15 +36,6 @@ p {
 }
 
 
-#screen {
-  display: block; 
-  margin: 0 auto 0 auto;
-  border: 2px solid var(--accent-color); 
-  width: 50vw; 
-  height: 50vh;
-}
-
-
 .container {
   margin: auto;
   display: flex;
