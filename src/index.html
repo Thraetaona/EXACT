@@ -36,9 +36,6 @@
     </section>
 
 
-    <canvas id="screen" width="640" height="480" ></canvas>
-
-
     <section class="container">
       <section id="registers">
         AX: <var class="register" id="AX">0</var> <br>
@@ -52,13 +49,13 @@
         DI: <var class="register" id="DI">0</var> <br>
         <br>
         AL: <var class="register" id="AL">0</var> <br>
-        CL: <var class="register" id="CL">0</var> <br>
-        DL: <var class="register" id="DL">0</var> <br>
-        BL: <var class="register" id="BL">0</var> <br>
-        <br>
         AH: <var class="register" id="AH">0</var> <br>
+        CL: <var class="register" id="CL">0</var> <br>
         CH: <var class="register" id="CH">0</var> <br>
+        <br>
+        DL: <var class="register" id="DL">0</var> <br>
         DH: <var class="register" id="DH">0</var> <br>
+        BX: <var class="register" id="BX">0</var> <br>
         BH: <var class="register" id="BH">0</var> <br>
         <br>
         ES: <var class="register" id="ES">0</var> <br>
@@ -92,11 +89,11 @@
           }
         }
         
-        const { instance } = await WebAssembly.instantiateStreaming(fetch('./emulator/8086.wasm'), imports);
-
-        instance.exports.start();
-
-        await updateUI(instance);
+        await WebAssembly.instantiateStreaming(fetch('./emulator/8086.wasm'), imports)
+        .then(async emulator => {
+          emulator.instance.exports.start();
+          await updateUI(emulator.instance);
+        });
       })();
     </script>
   </body>
