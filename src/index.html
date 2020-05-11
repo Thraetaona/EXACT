@@ -26,7 +26,7 @@
         <option selected disabled>Examples</option>
       </select>
       
-      <label class="button"><input type="file" id="upload" />Choose you'r own</label>
+      <label for="upload" class="button"><input type="file" id="upload" />Choose you'r own</label>
     </section>
 
     <section class="container">
@@ -91,6 +91,12 @@
         
         await WebAssembly.instantiateStreaming(fetch('./emulator/8086.wasm'), imports)
         .then(async emulator => {
+          var buffer;
+
+          document.getElementById('upload')  .addEventListener('change', function(e) {
+            new Blob().arrayBuffer(e.target.files[0]);
+          }, false);
+
           emulator.instance.exports.start();
           await updateUI(emulator.instance);
         });
