@@ -1,0 +1,87 @@
+/* 
+ * Constants and global configurations
+ */
+:root {
+  --accent-color: #32145a;
+  --theme-color: #000000;
+  --text-color: #ffffff;
+}
+
+* {
+  border-radius: 2px;
+}
+
+
+body {
+  background-color: var(--theme-color);
+  color: var(--text-color);
+  text-align: center !important;
+}
+
+
+
+/* 
+ * Custom styles for elements 
+ */
+h1 {
+  font-size: 2.5em;
+}
+
+p {
+  font-size: 1em;
+}
+
+.label {
+  font-size: 1.5em;
+}
+
+
+.container {
+  margin: auto;
+  display: flex;
+  justify-content: center;
+  font-size: 1em;
+}
+
+#registers {
+  padding: 1em;
+  margin: 4px 2px;
+  border: 2px solid var(--accent-color);
+  column-count: 3;
+  column-gap: 5em;
+  column-rule: 1px solid var(--accent-color);
+}
+legend {
+  font-family: Georgia;
+  font-weight: bold;
+  text-align: center;
+}
+
+
+.button {
+  background-color: var(--accent-color);
+  border: none;
+  color: var(--text-color);
+  padding: 15px 32px;  
+  margin: 4px 2px;
+  text-align: center;
+  text-decoration: none;
+  display: inline-block;
+  font-size: 1em;
+  cursor: pointer;
+  transition-duration: 0.4s;
+}
+.button:hover {
+  box-shadow: inset 0 0 0 1000px rgb(60,0,130);
+}
+.button:active {
+	box-shadow: inset 0 0 0 1000px rgba(0,0,0,0.2);
+}
+
+/* Work-around to replace the built-in upload button with the generic button class */
+.button input {
+  opacity: 0; /* Hide the default upload button */
+  cursor: pointer !important;
+  overflow: hidden; /* Suggest that the empty space (of the invisible button) should not appear */
+  position: absolute;
+}
