@@ -13,6 +13,14 @@
   ;; Where it's defined has no effect on performance, it is purely done to keep the emulator 'modular',
   ;; in a way that it expects memory, basic IO and other components to be provided externally;
   ;; just as a real, physical 8086 would.
+  ;;
+  ;;
+  ;; (Each number represents a byte and 64KiB bytes per Wasm page.)
+  ;; Memory layout:
+  ;;
+  ;; [0, 15]   => General-purpose and index Registers.
+  ;; (15, 270] => Array holding Instruction lengths.
+  ;; (270, ]   =>
 
 
 
@@ -68,7 +76,7 @@
   ;; Status Flag Registers
   (global $CF (export "CF") (mut i32) (i32.const 0)) ;; bit 0; Carry (Borrow) flag
   (global $PF (export "PF") (mut i32) (i32.const 0)) ;; bit 2; Parity flag
-  (global $AF (export "AF") (mut i32) (i32.const 0)) ;; bit 4; Auxiliary (Adjust) flag
+  (global $AF (export "AF") (mut i32) (i32.const 0)) ;; bit 4; Adjust (Auxiliary) flag
   (global $OF (export "OF") (mut i32) (i32.const 0)) ;; bit 11; Overflow flag
   (global $ZF (export "ZF") (mut i32) (i32.const 0)) ;; bit 6; Zero flag
   (global $SF (export "SF") (mut i32) (i32.const 0)) ;; bit 7; Sign flag
@@ -88,10 +96,36 @@
 
 
   (; 
-   ; Table Section
+   ; Data Section
+   ;)
+  ;; Array for holding Instruction lengths.
+  (data $opcodes.length (i32.const 16)
+    (; 0   1   2   3   4   5   6   7   8   9   A   B   C   D   E   F     / ;)
+    "\01 \01 \01 \01 \01 \01 \01 \01 \01 \01 \01 \01 \01 \01 \01 \01" (; 0 ;)
+    "\01 \01 \01 \01 \01 \01 \01 \01 \01 \01 \01 \01 \01 \01 \01 \01" (; 1 ;)
+    "\01 \01 \01 \01 \01 \01 \01 \01 \01 \01 \01 \01 \01 \01 \01 \01" (; 2 ;)
+    "\01 \01 \01 \01 \01 \01 \01 \01 \01 \01 \01 \01 \01 \01 \01 \01" (; 3 ;)
+    "\01 \01 \01 \01 \01 \01 \01 \01 \01 \01 \01 \01 \01 \01 \01 \01" (; 4 ;)
+    "\01 \01 \01 \01 \01 \01 \01 \01 \01 \01 \01 \01 \01 \01 \01 \01" (; 5 ;)
+    "\01 \01 \01 \01 \01 \01 \01 \01 \01 \01 \01 \01 \01 \01 \01 \01" (; 6 ;)
+    "\01 \01 \01 \01 \01 \01 \01 \01 \01 \01 \01 \01 \01 \01 \01 \01" (; 7 ;)
+    "\01 \01 \01 \01 \01 \01 \01 \01 \01 \01 \01 \01 \01 \01 \01 \01" (; 8 ;)
+    "\01 \01 \01 \01 \01 \01 \01 \01 \01 \01 \01 \01 \01 \01 \01 \01" (; 9 ;)
+    "\01 \01 \01 \01 \01 \01 \01 \01 \01 \01 \01 \01 \01 \01 \01 \01" (; A ;)
+    "\01 \01 \01 \01 \01 \01 \01 \01 \01 \01 \01 \01 \01 \01 \01 \01" (; B ;)
+    "\01 \01 \01 \01 \01 \01 \01 \01 \01 \01 \01 \01 \01 \01 \01 \01" (; C ;)
+    "\01 \01 \01 \01 \01 \01 \01 \01 \01 \01 \01 \01 \01 \01 \01 \01" (; D ;)
+    "\01 \01 \01 \01 \01 \01 \01 \01 \01 \01 \01 \01 \01 \01 \01 \01" (; E ;)
+    "\01 \01 \01 \01 \01 \01 \01 \01 \01 \01 \01 \01 \01 \01 \01 \01" (; F ;)
+  )
+
+
+
+  (; 
+   ; Table & Elements Section
    ;)
   ;; lookup table for dynamic dispatch of opcodes readen from hex code.
-  (table $opcodes.fetch 256 256 funcref) (elem (i32.const 0) 
+  (table $opcodes.fetch 256 256 funcref) (elem (i32.const 0)
     (;  0     1     2     3     4     5     6     7     8     9     A     B     C     D     E     F    / ;)
     $0x00 $0x01 $0x02 $0x03 $0x04 $0x05 $0x06 $0x07 $0x08 $0x09 $0x0a $0x0b $0x0c $0x0d $0x0e $0x0f (; 0 ;)
 (;    $0x10 $0x11 $0x12 $0x13 $0x14 $0x15 $0x16 $0x17 $0x18 $0x19 $0x1a $0x1b $0x1c $0x1d $0x1e $0x1f (; 1 ;)
@@ -158,7 +192,8 @@
     )
   )
   ;; Retrieves a previously stored 16-Bit value value from the specified register.
-  (func $registers.get16 (param $bit i32) (result i32)
+  (func $registers.get16 (param $bit i32) 
+                         (result i32)
     (i32.load16_s 
       (i32.mul ;; Ensure that the registers are not overlapping.
         (i32.rem_u ;; validation to ensure that other memory locations are not revealed.
@@ -180,7 +215,8 @@
     )
   )
   ;; Retrieves a previously stored 8-Bit value value from the specified register.
-  (func $registers.get8 (param $bit i32) (result i32)
+  (func $registers.get8 (param $bit i32) 
+                        (result i32)
     (i32.load8_s 
       (i32.rem_u ;; validation to ensure that other memory locations are not revealed.
         (local.get $bit)
@@ -189,10 +225,11 @@
     )
   )
 
-  ;; Sets Zero/Sign/Parity flags accordingly to the resulting value from math operations, 'consuming' the said value in process.
-  (func $flags.set_zsp (param $value i32)
+  ;; Sets Zero/Sign/Parity flags accordingly to the resulting value from math operations, does not 'Consume' the value.
+  (func $flags.set_zsp (param $value i32) 
+                       (result i32)
     ;; If the value equals 0 then ZF is set to 1; 0 otherwise.
-    (select (i32.const 0) (block (result i32) i32.const 0 global.set $SF i32.const 1 global.set $PF i32.const 1 global.set $ZF i32.const 1 br 1)
+    (select (i32.const 0) (block (result i32) i32.const 0 global.set $SF i32.const 1 global.set $PF i32.const 1 global.set $ZF local.get $value br 1)
             (local.get $value)) ;; For 0, we return early; setting other flags appropriately.
     global.set $ZF
     
@@ -209,31 +246,43 @@
       (i32.const -1)
     )
     global.set $PF
+
+    local.get $value
   )
   
-  ;; Sets Auxiliary/Overflow/Carry flags just like above.
-  (func $flags.set_aoc (param $value i32)
+  ;; Sets Adjust/Overflow/Carry flags just like above.
+  ;; Be aware that $flags.set_zsp has to be called before this, otherwise this might set flags incorrectly.
+  (func $flags.set_aoc (param $value i32) (param $destination i32) (param $source i32)
+                       (result i32)
     ;; if the result of a signed operation is too large to be represented in 8-Bits, Then OF is set to 1, 0 otherwise.
-      
-    
-    ;;global.set $OF
+    ;; http://teaching.idallen.com/dat2343/10f/notes/040_overflow.txt explains Carry & Overflow flags in a very detailed manner.
+    (i32.ne
+      (i32.and
+        (i32.shr_u (local.get $destination) (i32.const 15))
+        (i32.shr_u (local.get $source) (i32.const 15))
+      )
+      (i32.shr_u (local.get $value) (i32.const 15)) ;; Could also use (global.get $SF) if $flags.set_zsp is guaranteed to be called beforehand.
+    )
+    global.set $OF
   )
 
 
   (; Opcode backends ;)
-  ;; adds a value (+ an optional carry flag) to a register or memory.
-  (func $ADD (param $destination i32) (param $source i32) (result i32)
-    local.get $destination
-    local.get $source
-    i32.add
-    global.get $CF
-    i32.add
-    ;; TODO: push the above value to stack again and use set_aoc.
-    ;;call $set_zsp
-    ;;return
+  ;; adds a value (plus an optional carry flag) to a register or memory.
+  (func $ADD (param $destination i32) (param $source i32) (param $carry i32) 
+             (result i32)
+    (i32.add
+      (i32.add (local.get $destination) (local.get $source))
+      (select (global.get $CF) (i32.const 0)
+              (local.get $carry))
+    )
+    call $flags.set_zsp ;; This will also return (i.e won't 'Consume') the result from the above ADD function.
+    (; result ;) (local.get $destination) (local.get $source)
+    call $flags.set_aoc
+
     ;; It's not possible to pass global variables as function arguments,
-    ;; so this function simply returns the resulting number and sets arithmeticaal flags accordingly.  
-    ;; setting destination to the said value is done in opcodes.
+    ;; so this function simply returns the resulting number and sets status flags accordingly.  
+    ;; setting destination to the said number is done in opcodes.
   )
 
 
@@ -258,15 +307,25 @@
     call $ADD
     global.set $ ;)
   )
-  (func $0x04 (; ADD AL, Ib;) (;
-    i32.const 0
-    call $ADD
-    global.set $AL ;)
+  (func $0x04 (; ADD AL, Ib;)
+    (call $registers.set8 
+      (global.get $AL) 
+      (call $ADD
+        (global.get $AL) 
+
+        (i32.const 0)
+      )
+    )
   )
-  (func $0x05 (; ADD AX, Iv ;) (;
-    i32.const 0
-    call $ADD
-    global.set $AX ;)
+  (func $0x05 (; ADD AX, Iv ;)
+    (call $registers.set16 
+      (global.get $AX) 
+      (call $ADD
+        (global.get $AX)
+
+        (i32.const 0)
+      )
+    )
   )
   
   (func $0x06 (; PUSH ES ;)
@@ -324,7 +383,7 @@
   ;; this opcode sets AL to 256 if the carry flag is set, 0 otherwise.
   (func $0xd6 (; SALC ;)
     (call $registers.set8 
-      (global.get $DL)
+      (global.get $AL)
       (select (i32.const 0xFF) (i32.const 0x00)
               (global.get $CF))
     )

@@ -93,8 +93,8 @@
         .then(async emulator => {
           var buffer;
 
-          document.getElementById('upload')  .addEventListener('change', function(e) {
-            new Blob().arrayBuffer(e.target.files[0]);
+          document.getElementById('upload').addEventListener('change', function(uploaded) {
+            new Blob().arrayBuffer(uploaded.target.files[0]);
           }, false);
 
           emulator.instance.exports.start();
