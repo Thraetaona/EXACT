@@ -1,3 +1,19 @@
+;; EXACT: Emulating X86 iAPX CPU on NeT
+;; Copyright (C) 2020  Fereydoun Memarzanjany
+;;
+;; This program is free software: you can redistribute it and/or modify
+;; it under the terms of the GNU General Public License as published by
+;; the Free Software Foundation, either version 3 of the License, or
+;; (at your option) any later version.
+;;
+;; This program is distributed in the hope that it will be useful,
+;; but WITHOUT ANY WARRANTY; without even the implied warranty of
+;; MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE.  See the
+;; GNU General Public License for more details.
+;;
+;; You should have received a copy of the GNU General Public License
+;; along with this program.  If not, see <https://www.gnu.org/licenses/>.
+;;
 ;; Module-level documentation (Overview) resides in the 'README.md' file.
 ;;
 ;; Assemble with 'wat2wasm ./src/emulator/8086.wat -o ./src/emulator/8086.wasm --enable-bulk-memory'
@@ -15,8 +31,10 @@
   ;; just as a real, physical 8086 would.
   ;;
   ;;
-  ;; Memory layout:
-  ;; (Each number represents a byte and each memory page equqls 64KiB.)
+  ;; Be aware that a few -Bytes- could be saved by using a segmented module along with offsets or branching;
+  ;; However, that would significantly lower performance and complicate the codebase with no Reasonable gains.
+  ;; Linear memory layout:
+  ;; (Each number represents a byte and each WASM memory page equqls 64KiB.)
   ;;
   ;; [0, 7]         => General registers.
   ;; (7, 15]        => Index registers.
@@ -40,7 +58,7 @@
    ;)
   (export "start" (func $start))
   (export "memory" (memory 0))
-
+  (export "IP" (global $IP))
 
 
   (; 
@@ -48,11 +66,11 @@
    ;)
   (; These are instantiation-time global -constants-, equivalent to static variables in C and C++, solely for convenience.    ;
    ; They are accessed through $register.set/get interfaces; to ensure efficient and reliable emulation of decoded registers. ;)
-  ;; 16-Bit general purpose registers (Divided into High / low)
-  (global $AX i32 (i32.const 0)) ;; 0; Accumulator (divided into AH / AL)
-  (global $CX i32 (i32.const 1)) ;; 1; Count (divided into CH / CL)
-  (global $DX i32 (i32.const 2)) ;; 2; Data (divided into DH / DL)
-  (global $BX i32 (i32.const 3)) ;; 3; Base (divided into BH / BL)
+  ;; 16-Bit general purpose registers (Divided into Low / High)
+  (global $AX i32 (i32.const 0)) ;; 0; Accumulator (divided into AL / AH)
+  (global $CX i32 (i32.const 1)) ;; 1; Count (divided into CL / CH)
+  (global $DX i32 (i32.const 2)) ;; 2; Data (divided into DL / DH)
+  (global $BX i32 (i32.const 3)) ;; 3; Base (divided into BL / BH)
   ;; 16-Bit Index registers 
   (global $SP i32 (i32.const 4)) ;; 4; Stack pointer 
   (global $BP i32 (i32.const 5)) ;; 5; Base pointer 
@@ -61,12 +79,12 @@
 
   ;; 8-Bit decoded general purpose registers
   (global $AL i32 (i32.const 0)) ;; 0; Accumulator low
-  (global $CL i32 (i32.const 2)) ;; 1; Count low
-  (global $DL i32 (i32.const 4)) ;; 2; Data low
-  (global $BL i32 (i32.const 6)) ;; 3; Base low
-  (global $AH i32 (i32.const 1)) ;; 4; Accumulator High
-  (global $CH i32 (i32.const 3)) ;; 5; Count High
-  (global $DH i32 (i32.const 5)) ;; 6; Data High
+  (global $CL i32 (i32.const 1)) ;; 1; Count low
+  (global $DL i32 (i32.const 2)) ;; 2; Data low
+  (global $BL i32 (i32.const 3)) ;; 3; Base low
+  (global $AH i32 (i32.const 4)) ;; 4; Accumulator High
+  (global $CH i32 (i32.const 5)) ;; 5; Count High
+  (global $DH i32 (i32.const 6)) ;; 6; Data High
   (global $BH i32 (i32.const 7)) ;; 7; Base high
 
   ;; Segment registers
@@ -117,7 +135,7 @@
   ;; Array for holding Instruction lengths.
   (data $opcode_lenghts (i32.const 40)
     (; 0     1     2     3     4     5     6     7     8     9     A     B     C     D     E     F     / ;)
-    "\01" "\01" "\01" "\01" "\01" "\01" "\01" "\01" "\01" "\01" "\01" "\01" "\01" "\01" "\01" "\01" (; 0 ;)
+    "\02" "\01" "\01" "\01" "\01" "\01" "\01" "\01" "\01" "\01" "\01" "\01" "\01" "\01" "\01" "\01" (; 0 ;)
     "\01" "\01" "\01" "\01" "\01" "\01" "\01" "\01" "\01" "\01" "\01" "\01" "\01" "\01" "\01" "\01" (; 1 ;)
     "\01" "\01" "\01" "\01" "\01" "\01" "\01" "\01" "\01" "\01" "\01" "\01" "\01" "\01" "\01" "\01" (; 2 ;)
     "\01" "\01" "\01" "\01" "\01" "\01" "\01" "\01" "\01" "\01" "\01" "\01" "\01" "\01" "\01" "\01" (; 3 ;)
@@ -133,6 +151,10 @@
     "\01" "\01" "\01" "\01" "\01" "\01" "\01" "\01" "\01" "\01" "\01" "\01" "\01" "\01" "\01" "\01" (; D ;)
     "\01" "\01" "\01" "\01" "\01" "\01" "\01" "\01" "\01" "\01" "\01" "\01" "\01" "\01" "\01" "\01" (; E ;)
     "\01" "\01" "\01" "\01" "\01" "\01" "\01" "\01" "\01" "\01" "\01" "\01" "\01" "\01" "\01" "\01" (; F ;)
+  )
+
+  ;; 1Mib of Random-access memory.
+  (data $ram (i32.const 296)
   )
 
 
@@ -164,31 +186,16 @@
 
 
   (; 
-   ; Start Section
+   ; Start & Main Section
    ;)
   (func $start
-  
-  (call $register.general.set8 (global.get $AL) (i32.const 0x02))
-  (call $register.general.set16 (global.get $AX) (i32.const 0xf100))
 
-  (call $register.general.set16 (global.get $BX) (i32.const 55555))
-
-  (call $register.general.set16 (global.get $DI) (i32.const 21))
-  (call $register.general.set16 (global.get $SI) (i32.const 40404))
-
-
-  (call $register.general.set8 (global.get $CL) (i32.const 255))
-  (call $register.general.set8 (global.get $CH) (i32.const 255))
-
-  (call $register.general.set8 (global.get $DH) (i32.const 2))
-  (call $register.general.set8 (global.get $DL) (i32.const 1))
-
-  (call $register.segment.set (global.get $ES) (i32.const 20))
-  (call $register.segment.set (global.get $SS) (i32.const 10))
-
-
-  (call $register.flag.set (global.get $OF) (i32.const 1))
-
+    (call $set_aoc
+      (i32.const 4)
+      (i32.const -120)
+      (i32.const 023)
+    )
+    drop
   )
 
 
@@ -197,7 +204,6 @@
    ; Code Section
    ;)
   (; Helper functions ;)
-  
   (; Interfaces to work with registers, the input is sanitized to ensure that other memory locations are not revealed and to prevent overlaps. ;)
   ;; Stores a 16-Bit value in an index or general-purpose register.
   (func $register.general.set16 (param $bit i32) (param $value i32)
@@ -225,13 +231,37 @@
       )
     )
   )
+  ;; According to Intel's documentations Each register is assigned a number for encoding (Global constants section), 
+  ;; However as all registers are stored in memory, 8-Bit registers do not follow the same addressing scheme.
+  ;; Given that the registers are stored in the low-endian format (i.e., AH comes right after AL), but
+  ;; during encoding AH does not come right after AL (AH is 4 and AL is 0), they have to be decoded
+  ;; using a table that maps Intel's addresses onto ours, this is done through branching.
+  ;; register's assigned 0 to 3 are multiplied by 2; While the rest should be pointing to 1, 3, 5 and 7, respectively. 
+  (func $register.general.decode8 (param $bit i32)
+                                  (result i32)
+  (block (block (block (block (block (local.get $bit)
+            (br_table
+              0 0 0 0   ;; bit == {0, 1, 2, 3} --> (br 0)[0]
+              1         ;; bit == 4 --> (br 4)[1]
+              2         ;; bit == 5 --> (br 5)[3]
+              3         ;; bit == 6 --> (br 6)[5]
+              4         ;; 0 > bit OR result >= 7 --> (br 7 (Default))[7]
+              ))
+            ;; Target for (br 0)
+            (return (i32.mul (local.get $bit) (i32.const 2))))
+          ;; Target for (br 1)
+          (return (i32.const 1)))
+        ;; Target for (br 2)
+        (return (i32.const 3)))
+      ;; Target for (br 3)
+      (return (i32.const 5)))
+    ;; (Default) Target for (br 7)
+    (return (i32.const 7))
+  )
   ;; Stores a 8-Bit value in a general-purpose register.
   (func $register.general.set8 (param $bit i32) (param $value i32)
-    (i32.store8 offset=0
-      (i32.rem_u
-        (local.get $bit)
-        (i32.const 8)
-      )
+    (i32.store8 offset=0 
+      (call $register.general.decode8 (local.get $bit)) 
       (local.get $value)
     )
   )
@@ -239,12 +269,10 @@
   (func $register.general.get8 (param $bit i32) 
                                (result i32)
     (i32.load8_s offset=0
-      (i32.rem_u
-        (local.get $bit)
-        (i32.const 8)
-      )
+      (call $register.general.decode8 (local.get $bit)) 
     )
   )
+
   ;; Stores a 16-Bit value in a segment register.
   (func $register.segment.set (param $bit i32) (param $value i32)
     (i32.store16 offset=16 align=1
@@ -260,7 +288,7 @@
   )
   ;; Retrieves a previously stored 16-Bit value from the specified segment register.
   (func $register.segment.get (param $bit i32) 
-                                (result i32)
+                              (result i32)
     (i32.load16_s offset=16 align=1
       (i32.mul
         (i32.rem_u
@@ -271,6 +299,7 @@
       )
     )
   )
+
   ;; Stores a 1-Bit value in a flag register.
   (func $register.flag.set (param $bit i32) (param $value i32)
     (i32.store8 offset=24
@@ -294,26 +323,46 @@
   )
   
 
+  (;func $ram.set (param $address i32) (param $offset i32) (param $value i32)
+    (i32.store16 offset=0 align=1
+      (i32.mul
+        (i32.rem_u
+          (local.get $bit)
+          (i32.const 8)
+        )
+        (i32.const 2)
+      )
+      (local.get $value)
+    )
+  )
+  (func $ram.get (param $address i32) (param $offset i32)
+                 (result i32)
+    (i32.load8_s offset=296
+      (i32.rem_u
+        (local.get $bit)
+        (i32.const 16)
+      )
+    )
+  ;)
+
+
   ;; Sets Zero/Sign/Parity flags accordingly to the resulting value from math operations, does not 'Consume' the value.
   (func $set_zsp (param $value i32) 
-                       (result i32)
+                 (result i32)
     ;; If the value equals 0 then ZF is set to 1; 0 otherwise.
     (call $register.flag.set
       (global.get $ZF)
-      (select (i32.const 0) (block (result i32) (call $register.flag.set (global.get $SF) (i32.const 0))
-                                                (call $register.flag.set (global.get $PF) (i32.const 1)) 
-                                                (call $register.flag.set (global.get $ZF) (i32.const 1)) 
-                                                local.get $value br 1)
-              (local.get $value)) ;; For 0, we return early; setting other flags appropriately.
+      (select (i32.const 0) (i32.const 1)
+              (local.get $value))
     )
-    
+
     ;; If the high-order bit of the value is a 1 then SF is set to 1; 0 otherwise. (Two's complement notation)
     (call $register.flag.set
       (global.get $SF)
       (i32.shr_u (local.get $value) (i32.const 15))
     )
 
-    ;; If the value has even parity (an even number of 1-Bits) PF is set to 1, 0 otherwise.
+    ;; If the value has even parity (an even number of 1-Bits) PF is set to 1; 0 otherwise.
     (call $register.flag.set
       (global.get $PF)
       (i32.xor ;; This will negate the outcome (as if i32.not existed).
@@ -325,25 +374,45 @@
       )
     )
 
-    local.get $value
-    return
+    (return (local.get $value))
   )
   
   ;; Sets Adjust/Overflow/Carry flags just like above.
-  ;; Be aware that $set_zsp has to be called before this, otherwise this might set flags incorrectly.
-  (;func $set_aoc (param $value i32) (param $destination i32) (param $source i32)
-                       (result i32)
-    ;; if the result of a signed operation is too large to be represented in 8-Bits, Then OF is set to 1, 0 otherwise.
+  ;; Be aware that $set_zsp has to be called before this; otherwise this might set flags incorrectly.
+  (func $set_aoc (param $value i32) (param $destination i32) (param $source i32)
+                 (result i32)
+    ;; If the result of a signed operation is too large to be represented in 8-Bits, Then OF is set to 1; 0 otherwise.
     ;; http://teaching.idallen.com/dat2343/10f/notes/040_overflow.txt explains Carry & Overflow flags in a very detailed manner.
-    (i32.
-      (i32.add
-        (i32.shr_u (local.get $destination) (i32.const 15))
-        (i32.shr_u (local.get $source) (i32.const 15))
-      )
-      (i32.shr_u (local.get $value) (i32.const 15)) ;; Could also use (global.get $SF) if $set_zsp is guaranteed to be called beforehand.
+    (call $register.flag.set
+      (global.get $OF)
+      (block (block
+        (i32.add ;; Incrementing by 1 will ensure that branching works properly (i.e., not branching for less than zero).
+          (i32.sub ;; If the result equals -1 or 2, then an overflow happend.
+            (i32.add ;; If the result is 2 both values were Negative; if it was 0 then both were Positive; otherwise only one of them was.
+              (i32.shr_u (local.get $destination) (i32.const 15))
+              (i32.shr_u (local.get $source) (i32.const 15))
+            )
+            (i32.shr_u (local.get $value) (i32.const 15)) ;; Could also use Sign Flag's value if $set_zsp is guaranteed to be called beforehand.
+          )
+          (i32.const 1)
+        )
+        (br_table
+          1    ;; result == 0 --> (br 1)[Overflow]
+          0 0  ;; result == {1, 2} --> (br 0)[0]
+          1    ;; 0 > result OR result >= 3 --> (br 1 (Default))[Overflow]
+          ))
+        ;; Target for (br 0)
+        (return (i32.const 0)))
+      ;; (Default) Target for (br 1)
+      (return (i32.const 1))
     )
-    global.set $OF
-  ;)
+
+    ;; If the result of a signed operation is too large to be represented in 8-Bits, Then OF is set to 1; 0 otherwise.
+    (call $register.flag.set
+      (global.get $CF)
+      (i32.const 65535)
+    )
+  )
 
 
   (; Opcode backends ;)
@@ -355,7 +424,7 @@
       (select (global.get $CF) (i32.const 0)
               (local.get $carry))
     )
-    call $set_zsp ;; This will also return (i.e won't 'Consume') the result from the above ADD function.
+    call $set_zsp ;; This will also return (i.e., won't 'Consume') the result from the above ADD function.
     (; above result ;) (local.get $destination) (local.get $source)
     call $set_aoc
 
@@ -366,22 +435,22 @@
 
 
   (; Opcodes ;)
-  (func $0x00 (; ADD ;) (;
+  (func $0x00 (; ADD Eb, Gb ;) (;
     i32.const 0
     call $ADD
     global.set $ ;)
   )
-  (func $0x01 (; ADD ;) (;
+  (func $0x01 (; ADD Ev, Gv ;) (;
     i32.const 0
     call $ADD
     global.set $ ;)
   )
-  (func $0x02 (; ADD ;) (;
+  (func $0x02 (; ADD Gb, Eb ;) (;
     i32.const 0
     call $ADD
     global.set $ ;)
   )
-  (func $0x03 (; ADD ;) (;
+  (func $0x03 (; ADD Gv, Ev ;) (;
     i32.const 0
     call $ADD
     global.set $ ;)
@@ -447,7 +516,7 @@
   ;; while a few others such as 'SALC' actually did something useful.
   ;;
   ;; However, a real 8086 (or anything earlier than 80186) would do nothing when encountering a truly invalid opcode (hence the nop).
-  ;; This emulator aims to be FULLY compatible only (i.e. no co-processors) with the original 8086, so it supports the 
+  ;; This emulator aims to be FULLY compatible only (i.e.,. no co-processors) with the original 8086, so it supports the 
   ;; redundant opcodes or others like 'SALC'.  Also, several opcodes (e.g. 0xd8 - 0xdf) are only valid when a co-processor like x87 is present; 
   ;; but since we are emulating this on fast, modern hardware, and co-processors were very rare and expensive back then; 
   ;; emulating a 8087 is out of this project's scope, and therefore invalid.
@@ -459,12 +528,12 @@
     ;; work-in-progress
   )
 
-  ;; this opcode sets AL to 256 if the carry flag is set, 0 otherwise.
+  ;; this opcode sets AL to 256 if the carry flag is set; 0 otherwise.
   (func $0xd6 (; SALC ;)
     (call $register.general.set8 
       (global.get $AL)
       (select (i32.const 0xFF) (i32.const 0x00)
-              (global.get $CF))
+              (call $register.general.get8 (global.get $CF)))
     )
   )
 

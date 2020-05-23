@@ -18,7 +18,7 @@
     <p>
       <strong><b>E</b>mulating <b>X</b>86 i<b>A</b>PX <b>C</b>PU on Ne<b>T</b></strong>
     </p>
-    
+    <hr>
 
     <section class="container">
       <span class="label" for="examples">Program:</span>
@@ -26,13 +26,14 @@
         <option selected disabled>Examples</option>
       </select>
       
-      <label for="upload" class="button"><input type="file" id="upload" />Choose you'r own</label>
+      <label for="upload" class="button"><input type="file" id="upload" />Choose your own</label>
     </section>
 
-    <section class="container">
-      <button class="button" id='run'>Execute</button>
-      <button class="button" id='step'>Step</button>
-      <button class="button" id='stop'>Halt</button>
+    <!-- Control buttons are disabled until something is available to run -->
+    <section class="container" id="control">
+      <button class="button" id='run' disabled>Execute</button>
+      <button class="button" id='step' disabled>Step</button>
+      <button class="button" id='stop' disabled>Halt</button>
     </section>
 
 
@@ -72,6 +73,8 @@
         IF: <var class="register" id="IF">0</var> <br>
         DF: <var class="register" id="DF">0</var> <br>
         OF: <var class="register" id="OF">0</var> <br>
+        <br>
+        IP: <var class="register" id="IP">0</var> <br>
       </section>
       <section id="memory">
       </section>
@@ -81,20 +84,29 @@
     <script type="module" async>
       "use strict";
       import updateUI from './util/ui.js';
-
+      
       (async () => {
         const imports = {
           env: {
-            memory: new WebAssembly.Memory({initial: 16, maximum: 16384, shared: false}),
+            memory: new WebAssembly.Memory({initial: 17, maximum: 17, shared: false}),
           }
         }
-        
+
         await WebAssembly.instantiateStreaming(fetch('./emulator/8086.wasm'), imports)
         .then(async emulator => {
           var buffer;
 
           document.getElementById('upload').addEventListener('change', function(uploaded) {
-            new Blob().arrayBuffer(uploaded.target.files[0]);
+            const opcodes = new Blob().arrayBuffer(uploaded.target.files[0]);
+            const ram = new Uint8Array(emulator.instance.exports.memory.buffer);
+
+            for (let offset = 0; offset < opcodes.byteLength; offset++) {
+              ram[offset + 296] = opcodes.getUint8(offset);
+            }
+
+            for (let offset = 0; offset < 3; offset++) {
+              const buttons = document.getElementById("control").children[offset].disabled = false;
+            }
           }, false);
 
           emulator.instance.exports.start();

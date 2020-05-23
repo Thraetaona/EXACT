@@ -3,6 +3,7 @@
  */
 :root {
   --accent-color: #32145a;
+  --secondary-color: #5c2d91;
   --theme-color: #000000;
   --text-color: #ffffff;
 }
@@ -24,15 +25,33 @@ body {
  * Custom styles for elements 
  */
 h1 {
-  font-size: 2.5em;
+  font-size: 4em;
+  color: var(--text-color);
+  text-align: center;
+  animation: glow 1s ease-in-out infinite alternate;
 }
 
 p {
-  font-size: 1em;
+  font-size: 1.25em;
+}
+
+@keyframes glow {
+  from {
+    text-shadow: 0 0 10px var(--text-color), 0 0 20px var(--text-color), 0 0 30px var(--accent-color), 0 0 40px var(--accent-color), 0 0 50px var(--accent-color), 0 0 60px var(--accent-color), 0 0 70px var(--accent-color);
+  }
+  
+  to {
+    text-shadow: 0 0 20px var(--text-color), 0 0 30px var(--secondary-color), 0 0 40px var(--secondary-color), 0 0 50px var(--secondary-color), 0 0 60px var(--secondary-color), 0 0 70px var(--secondary-color), 0 0 80px var(--secondary-color);
+  }
 }
 
 .label {
   font-size: 1.5em;
+}
+
+hr {
+  border: 1px solid var(--accent-color);
+  width: 25%
 }
 
 
@@ -40,7 +59,7 @@ p {
   margin: auto;
   display: flex;
   justify-content: center;
-  font-size: 1em;
+  font-size: 0.8em;
 }
 
 #registers {
@@ -48,8 +67,9 @@ p {
   margin: 4px 2px;
   border: 2px solid var(--accent-color);
   column-count: 3;
-  column-gap: 5em;
+  column-gap: 6em;
   column-rule: 1px solid var(--accent-color);
+  font-size: 0.95em;
 }
 legend {
   font-family: Georgia;
@@ -80,8 +100,9 @@ legend {
 
 /* Work-around to replace the built-in upload button with the generic button class */
 .button input {
-  opacity: 0; /* Hide the default upload button */
+  opacity: 0 !important; /* Hide the default upload button */
   cursor: pointer !important;
-  overflow: hidden; /* Suggest that the empty space (of the invisible button) should not appear */
-  position: absolute;
+  overflow: hidden !important; /* Suggest that the empty space (of the invisible button) should not appear */
+  position: absolute !important;
+  display: none !important;
 }
