@@ -31,7 +31,7 @@
   ;; just as a real, physical 8086 would.
   ;;
   ;;
-  ;; Be aware that a few -Bytes- could be saved by using a segmented module along with offsets or branching;
+  ;; Be aware that a few _Bytes_ could be saved by using a segmented module along with offsets or branching;
   ;; However, that would significantly lower performance and complicate the codebase with no Reasonable gains.
   ;; Linear memory layout:
   ;; (Each number represents a byte and each WASM memory page equqls 64KiB.)
@@ -64,7 +64,7 @@
   (; 
    ; Global Section
    ;)
-  (; These are instantiation-time global -constants-, equivalent to static variables in C and C++, solely for convenience.    ;
+  (; These are instantiation-time global _constants_, equivalent to static variables in C and C++, solely for convenience.    ;
    ; They are accessed through $register.set/get interfaces; to ensure efficient and reliable emulation of decoded registers. ;)
   ;; 16-Bit general purpose registers (Divided into Low / High)
   (global $AX i32 (i32.const 0)) ;; 0; Accumulator (divided into AL / AH)
@@ -106,7 +106,7 @@
   (global $DF i32 (i32.const 10)) ;; bit 10; Direction flag
 
 
-  (; The followings are actual mutable global -variables-.  Unlike the above globals these are accessed directly. ;)
+  (; The followings are actual mutable global _variables_.  Unlike the above globals these are accessed directly. ;)
   ;; Program counter
   (global $IP (mut i32) (i32.const 0)) ;; 0; Instruction pointer
 
@@ -115,7 +115,7 @@
   (; 
    ; Data Section
    ;)
-  ;; Array for holding all registers.
+  ;; Array for holding all registers (Except IP).
   ;;
   ;; WebAssembly is low-endian, although endianness does not matter inside a register, as they are byte-accessible rather than byte-addressable.
   ;; Also, it appears that the 8086 had some 'reserved' flags that were always(?) set to 1; UD is used to represent those.
@@ -190,10 +190,10 @@
    ;)
   (func $start
 
-    (call $set_aoc
+    (call $set_aco
+      (i32.const 5)
+      (i32.const 1)
       (i32.const 4)
-      (i32.const -120)
-      (i32.const 023)
     )
     drop
   )
@@ -379,8 +379,27 @@
   
   ;; Sets Adjust/Overflow/Carry flags just like above.
   ;; Be aware that $set_zsp has to be called before this; otherwise this might set flags incorrectly.
-  (func $set_aoc (param $value i32) (param $destination i32) (param $source i32)
+  (func $set_aco (param $value i32) (param $destination i32) (param $source i32)
                  (result i32)
+    ;; If the result of a signed operation is too large to be represented in 8-Bits, Then OF is set to 1; 0 otherwise.
+    (;call $register.flag.set
+      (global.get $AF)
+
+    ;)
+
+    ;; 
+    (call $register.flag.set
+      (global.get $CF)
+      (select (i32.const 1) (i32.and
+                              (i32.ne (local.get $destination) (local.get $source))
+                              (i32.eq
+                                (i32.add (local.get $destination) (local.get $source))
+                                (local.get $value)
+                              )
+                            )
+              (i32.ge_u (local.get $value) (i32.const 65536)))
+    )
+    
     ;; If the result of a signed operation is too large to be represented in 8-Bits, Then OF is set to 1; 0 otherwise.
     ;; http://teaching.idallen.com/dat2343/10f/notes/040_overflow.txt explains Carry & Overflow flags in a very detailed manner.
     (call $register.flag.set
@@ -388,7 +407,7 @@
       (block (block
         (i32.add ;; Incrementing by 1 will ensure that branching works properly (i.e., not branching for less than zero).
           (i32.sub ;; If the result equals -1 or 2, then an overflow happend.
-            (i32.add ;; If the result is 2 both values were Negative; if it was 0 then both were Positive; otherwise only one of them was.
+            (i32.add ;; If the result is 2 both values were Negative; if it is 0 then both were Positive; otherwise only one of them was.
               (i32.shr_u (local.get $destination) (i32.const 15))
               (i32.shr_u (local.get $source) (i32.const 15))
             )
@@ -402,16 +421,12 @@
           1    ;; 0 > result OR result >= 3 --> (br 1 (Default))[Overflow]
           ))
         ;; Target for (br 0)
-        (return (i32.const 0)))
+        (i32.const 0) (br 1))
       ;; (Default) Target for (br 1)
-      (return (i32.const 1))
+      (i32.const 1 )
     )
 
-    ;; If the result of a signed operation is too large to be represented in 8-Bits, Then OF is set to 1; 0 otherwise.
-    (call $register.flag.set
-      (global.get $CF)
-      (i32.const 65535)
-    )
+    (return (local.get $value))
   )
 
 
@@ -426,7 +441,7 @@
     )
     call $set_zsp ;; This will also return (i.e., won't 'Consume') the result from the above ADD function.
     (; above result ;) (local.get $destination) (local.get $source)
-    call $set_aoc
+    call $set_aco
 
     ;; It's not possible to pass global variables as function arguments,
     ;; so this function simply returns the resulting number and sets status flags accordingly.  
@@ -516,7 +531,7 @@
   ;; while a few others such as 'SALC' actually did something useful.
   ;;
   ;; However, a real 8086 (or anything earlier than 80186) would do nothing when encountering a truly invalid opcode (hence the nop).
-  ;; This emulator aims to be FULLY compatible only (i.e.,. no co-processors) with the original 8086, so it supports the 
+  ;; This emulator aims to be FULLY compatible only (i.e., no co-processors) with the original 8086, so it supports the 
   ;; redundant opcodes or others like 'SALC'.  Also, several opcodes (e.g. 0xd8 - 0xdf) are only valid when a co-processor like x87 is present; 
   ;; but since we are emulating this on fast, modern hardware, and co-processors were very rare and expensive back then; 
   ;; emulating a 8087 is out of this project's scope, and therefore invalid.
