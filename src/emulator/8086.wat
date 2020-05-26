@@ -24,7 +24,7 @@
   (; 
    ; Memory Section
    ;)
-  ;; It is possible to define the memory within webassembly like this "(memory 1 16384 shared)",
+  ;; It is possible to define the memory within webassembly like this "(memory 17 17)",
   ;; however, we currently define it in the host environment and simply export it to this module.
   ;; Where it's defined has no effect on performance, it is purely done to keep the emulator 'modular',
   ;; in a way that it expects memory, basic IO and other components to be provided externally;
@@ -40,7 +40,7 @@
   ;; (7, 15]        => Index registers.
   ;; (15, 23]       => Segment registers.
   ;; (23, 39]       => Flag registers.
-  ;; (39, 295]      => Array holding Instruction lengths.
+  ;; (39, 295]      => Array holding opcode lengths.
   ;; (295, 1048871] => 1Mib of Random-access memory.
   ;; (1048871, ] => 
 
@@ -132,7 +132,7 @@
     "\00" "\00" "\00" "\00" "\01" "\01" "\01" "\01" (; Flag ;)
   )
 
-  ;; Array for holding Instruction lengths.
+  ;; Array for holding opcode lengths.
   (data $opcode_lenghts (i32.const 40)
     (; 0     1     2     3     4     5     6     7     8     9     A     B     C     D     E     F     / ;)
     "\02" "\01" "\01" "\01" "\01" "\01" "\01" "\01" "\01" "\01" "\01" "\01" "\01" "\01" "\01" "\01" (; 0 ;)
@@ -189,13 +189,9 @@
    ; Start & Main Section
    ;)
   (func $start
+      (call $register.flag.set (global.get $CF) (i32.const 1))
+      ;;(call_indirect (i32.const 0x00))
 
-    (call $set_aco
-      (i32.const 5)
-      (i32.const 1)
-      (i32.const 4)
-    )
-    drop
   )
 
 
@@ -204,6 +200,22 @@
    ; Code Section
    ;)
   (; Helper functions ;)
+  ;; This will invert the supplied value, as if an 'i32.not' instruction existed in WebAssembly.
+  (func $i32.not (param $value i32)
+                 (result i32)
+    (return
+      (i32.xor (local.get $value) (i32.const 1))
+    )
+  )
+  ;; Similar to above, this will negate it's operand.
+  (func $i32.neg (param $value i32)
+                 (result i32)
+    (return
+      (i32.mul (local.get $value) (i32.const -1))
+    )
+  )
+
+
   (; Interfaces to work with registers, the input is sanitized to ensure that other memory locations are not revealed and to prevent overlaps. ;)
   ;; Stores a 16-Bit value in an index or general-purpose register.
   (func $register.general.set16 (param $bit i32) (param $value i32)
@@ -323,6 +335,19 @@
   )
   
 
+  ;; Returns the length of the specified opcode.
+  (func $opcode_lenghts.fetch (param $opcode i32) 
+                              (result i32)
+    (i32.load8_u offset=40
+      (i32.rem_u
+        (local.get $opcode)
+        (i32.const 256)
+      )
+    )
+  )
+
+
+
   (;func $ram.set (param $address i32) (param $offset i32) (param $value i32)
     (i32.store16 offset=0 align=1
       (i32.mul
@@ -365,12 +390,11 @@
     ;; If the value has even parity (an even number of 1-Bits) PF is set to 1; 0 otherwise.
     (call $register.flag.set
       (global.get $PF)
-      (i32.xor ;; This will negate the outcome (as if i32.not existed).
+      (call $i32.not
         (i32.rem_u
           (i32.popcnt (local.get $value))
           (i32.const 2)
         )
-        (i32.const 1)
       )
     )
 
@@ -378,82 +402,95 @@
   )
   
   ;; Sets Adjust/Overflow/Carry flags just like above.
-  ;; Be aware that $set_zsp has to be called before this; otherwise this might set flags incorrectly.
-  (func $set_aco (param $value i32) (param $destination i32) (param $source i32)
-                 (result i32)
-    ;; If the result of a signed operation is too large to be represented in 8-Bits, Then OF is set to 1; 0 otherwise.
-    (;call $register.flag.set
+  ;; $operation indicates whether the operation is a subtraction (1) or an addition (0).
+  ;; $mode states a 16-Bit operation (1) or 8-Bit (0).
+  (func $set_aco (param $mode i32) (param $operation i32) (param $destination i32) (param $source i32)
+                 (local $result i32)
+    (select (call $i32.neg (local.get $source)) (local.get $source)
+            (local.get $operation))
+    local.set $source
+    ;; The result from addition/subtraction has to be calculated locally to properly detect things like overflowing.
+    (i32.add (local.get $destination) (local.get $source))
+    local.set $result
+
+    ;; Auxiliary Flag is like CF, but used when working with binary-coded decimals (BCD).
+    (call $register.flag.set
       (global.get $AF)
+      (select (i32.and (i32.xor (i32.xor (local.get $destination) (call $i32.neg (local.get $source))) (local.get $result)) (i32.const 16))
+                (i32.eq
+                  (i32.and (i32.xor (i32.xor (local.get $destination) (local.get $source)) (local.get $result)) (i32.const 16))
+                  (i32.const 16)
+                )
+              (local.get $operation))
+    )
 
-    ;)
-
-    ;; 
+    ;; If the result of an arithmetic operation is larger than (2 ^ 16) - 1) OR the subtrahend is larger than minuend, CF is set to 1; 0 otherwise.
     (call $register.flag.set
       (global.get $CF)
-      (select (i32.const 1) (i32.and
-                              (i32.ne (local.get $destination) (local.get $source))
-                              (i32.eq
-                                (i32.add (local.get $destination) (local.get $source))
-                                (local.get $value)
-                              )
-                            )
-              (i32.ge_u (local.get $value) (i32.const 65536)))
+      (select (i32.const 1) (select (i32.gt_u (call $i32.neg (local.get $source)) (local.get $destination)) (i32.const 0)                          
+                                    (local.get $operation))
+              (i32.ge_u (local.get $result) (select (i32.const 65536) (i32.const 256) 
+                                                    (local.get $mode))))
     )
     
     ;; If the result of a signed operation is too large to be represented in 8-Bits, Then OF is set to 1; 0 otherwise.
     ;; http://teaching.idallen.com/dat2343/10f/notes/040_overflow.txt explains Carry & Overflow flags in a very detailed manner.
+    ;; Summarizing, overflow only occurs if both operands have the same sign and it differs from the result's sign.
     (call $register.flag.set
       (global.get $OF)
-      (block (block
-        (i32.add ;; Incrementing by 1 will ensure that branching works properly (i.e., not branching for less than zero).
-          (i32.sub ;; If the result equals -1 or 2, then an overflow happend.
-            (i32.add ;; If the result is 2 both values were Negative; if it is 0 then both were Positive; otherwise only one of them was.
-              (i32.shr_u (local.get $destination) (i32.const 15))
-              (i32.shr_u (local.get $source) (i32.const 15))
+      (call $i32.not
+        (i32.rem_u ;; This will separate even's (Overflow) from odds.  The outcome has to be negated.
+          (i32.popcnt ;; Both 0 (00b) and 3 (11b) will have an even number of 1-Bits, unlike 1 (01b) and 2 (10b).
+            (i32.add ;; Incrementing by 1 will ensure that Two's complement (For -1) will not interfere with population counting.
+              (i32.sub ;; If the result equals -1 or 2, then an overflow happend.
+                (i32.add ;; If the result is 2 both values were Negative; if it is 0 then both were Positive; otherwise only one of them was.
+                  (i32.shr_u (local.get $destination) (i32.const 15))
+                  (i32.shr_u (local.get $source) (i32.const 15))
+                )
+                (select (i32.const 1) (i32.const 0)
+                        (i32.shr_s 
+                          (i32.shl (local.get $result) (select (i32.const 16) (i32.const 24)
+                                                               (local.get $mode)))
+                          (i32.const 31)
+                        )) ;; Could also use Sign Flag's value, if $set_zsp is guaranteed to be called beforehand.
+              )
+              (i32.const 1)
             )
-            (i32.shr_u (local.get $value) (i32.const 15)) ;; Could also use Sign Flag's value if $set_zsp is guaranteed to be called beforehand.
           )
-          (i32.const 1)
+        (i32.const 2)
         )
-        (br_table
-          1    ;; result == 0 --> (br 1)[Overflow]
-          0 0  ;; result == {1, 2} --> (br 0)[0]
-          1    ;; 0 > result OR result >= 3 --> (br 1 (Default))[Overflow]
-          ))
-        ;; Target for (br 0)
-        (i32.const 0) (br 1))
-      ;; (Default) Target for (br 1)
-      (i32.const 1 )
+      )
     )
-
-    (return (local.get $value))
   )
 
 
-  (; Opcode backends ;)
-  ;; adds a value (plus an optional carry flag) to a register or memory.
-  (;func $ADD (param $destination i32) (param $source i32) (param $carry i32) 
+  (; Opcode backends (Commonly used assets across opcodes) ;)
+  ;; a sign-agnostic Binary operation that adds a value (plus an optional carry flag) to a register or memory.
+  ;; As for subtraction, Although it is a "real" instruction at the hardware level (i.e., has it's own binary opcode and the 
+  ;; CPU itself will be aware that it should produce result of subtraction), since we are _emulating_ a 8086
+  ;; we can reuse the existing $ADD function; we had to take a completely different approach if we were to _simulate_ that CPU.
+  ;; $operation indicates whether the operation is a subtraction (1) or an addition (0).
+  ;; $mode states a 16-Bit operation (1) or 8-Bit (0).
+  (func $ADD (param $mode i32) (param $operation i32) (param $destination i32) (param $source i32) (param $carry i32) 
              (result i32)
     (i32.add
-      (i32.add (local.get $destination) (local.get $source))
-      (select (global.get $CF) (i32.const 0)
+      (i32.add (local.get $destination) (select (call $i32.neg (local.get $source)) (local.get $source)
+                                                (local.get $operation)))
+      (select (select (call $i32.neg (call $register.flag.get (global.get $CF))) (call $register.flag.get (global.get $CF))
+                      (local.get $operation)) (i32.const 0)
               (local.get $carry))
     )
-    call $set_zsp ;; This will also return (i.e., won't 'Consume') the result from the above ADD function.
-    (; above result ;) (local.get $destination) (local.get $source)
-    call $set_aco
+    call $set_zsp 
+    (call $set_aco (local.get $mode) (local.get $operation ) (local.get $destination) (local.get $source))
 
-    ;; It's not possible to pass global variables as function arguments,
-    ;; so this function simply returns the resulting number and sets status flags accordingly.  
-    ;; setting destination to the said number is done in opcodes.
-  ;)
+    return (; value that is left on the stack;)
+  )
 
 
   (; Opcodes ;)
-  (func $0x00 (; ADD Eb, Gb ;) (;
-    i32.const 0
-    call $ADD
-    global.set $ ;)
+  (func $0x00 (; ADD Eb, Gb ;)
+    ;;(call $ADD (i32.const 0) (i32.const 0) (global.get ) (global.get ))
+
   )
   (func $0x01 (; ADD Ev, Gv ;) (;
     i32.const 0
@@ -547,8 +584,8 @@
   (func $0xd6 (; SALC ;)
     (call $register.general.set8 
       (global.get $AL)
-      (select (i32.const 0xFF) (i32.const 0x00)
-              (call $register.general.get8 (global.get $CF)))
+      (select (i32.const 0xff) (i32.const 0x00)
+              (call $register.flag.get (global.get $CF)))
     )
   )
 
