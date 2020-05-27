@@ -7,7 +7,7 @@
     <meta name="title" content="EXACT">
     <meta name="author" content="Fereydoun Memarzanjany">
     <meta name="description" content="Graphical Intel iAPX 86/10 Emulator Written In Pure WebAssembly.">
-    <meta name="keywords" content="intel, 8086, iapx, emulator, webassembly, wasm, wat, wast, assembly, browser, cpu, cpu-emulator, 16bit, emulation, graphical">
+    <meta name="keywords" content="intel, 8086, iapx, emulator, webassembly, wasm, wat, wast, assembly, browser, cpu, cpu-emulator, 16bit, emulation, graphical, x86, 8086-emulator, 8086-architecture">
     <link rel="stylesheet" type="text/css" href="stylesheet.css" />
   </head>
 
@@ -94,23 +94,33 @@
 
         await WebAssembly.instantiateStreaming(fetch('./emulator/8086.wasm'), imports)
         .then(async emulator => {
-          var buffer;
-
           document.getElementById('upload').addEventListener('change', function(uploaded) {
-            const opcodes = new Blob().arrayBuffer(uploaded.target.files[0]);
+            const file = uploaded.target.files[0];
+            const reader = new FileReader();
             const ram = new Uint8Array(emulator.instance.exports.memory.buffer);
 
-            for (let offset = 0; offset < opcodes.byteLength; offset++) {
-              ram[offset + 296] = opcodes.getUint8(offset);
+            reader.onload = function() {
+              var opcodes = Array.from(new Uint8Array(reader.result));    
+              for (let offset = 0; offset < opcodes.byteLength; offset++) {
+                ram[offset + 296] = opcodes.getUint8(offset);
+              }
+              
             }
+
+//console.log(opcodes[1]);
 
             for (let offset = 0; offset < 3; offset++) {
               const buttons = document.getElementById("control").children[offset].disabled = false;
             }
           }, false);
 
-          emulator.instance.exports.start();
-          await updateUI(emulator.instance);
+          document.getElementById('run').addEventListener('click', function() {
+            emulator.instance.exports.start();
+          }, false);
+
+          window.setInterval(function(){
+            updateUI(emulator.instance);
+          }, 1000);
         });
       })();
     </script>
