@@ -40,7 +40,7 @@
   ;; (7, 15]        => Index registers.
   ;; (15, 23]       => Segment registers.
   ;; (23, 39]       => Flag registers.
-  ;; (39, 295]      => Array holding opcode lengths.
+  ;; (39, 295]      => Array holding OpCode lengths.
   ;; (295, 1048871] => 1Mib of Random-access memory.
   ;; (1048871, ] => 
 
@@ -110,6 +110,8 @@
   ;; Program counter
   (global $IP (mut i32) (i32.const 0)) ;; 0; Instruction pointer
 
+  ;; Current opcode that should be executed
+  (global $opcode (mut i32) (i32.const 0))
 
 
   (; 
@@ -189,8 +191,14 @@
    ; Start & Main Section
    ;)
   (func $start
-      (call $register.flag.set (global.get $CF) (i32.const 1))
-      ;;(call_indirect (i32.const 0x00))
+      (global.set $opcode 
+        (call $ram.get8 
+          (call $register.flag.get (global.get $CS) 
+          (global.get $IP))
+        )
+      )
+      
+      (call_indirect (global.get $opcode))
 
   )
 
@@ -347,28 +355,58 @@
   )
 
 
-
-  (;func $ram.set (param $address i32) (param $offset i32) (param $value i32)
-    (i32.store16 offset=0 align=1
-      (i32.mul
-        (i32.rem_u
-          (local.get $bit)
-          (i32.const 8)
+  (; Interfaces to work with RAM, available in 16 and 8 bit variants. ;)
+  (func $ram.decode (param $address i32) (param $offset i32)
+                    (result i32)
+  (return
+    (i32.add
+      (i32.and
+        (i32.shl (local.get $address) (i32.const 4))
+        (i32.const 1048560)
         )
-        (i32.const 2)
+        (i32.and (local.get $address) (i32.const 65535))
       )
+    )                  
+  )
+  (func $ram.set16 (param $address i32) (param $offset i32) (param $value i32)
+    (i32.store16 offset=296 align=1
+      (call $ram.decode (local.get $address) (local.get $offset))
       (local.get $value)
     )
   )
-  (func $ram.get (param $address i32) (param $offset i32)
-                 (result i32)
+  (func $ram.get16 (param $address i32) (param $offset i32)
+                   (result i32)
+    (i32.load16_s offset=296 align=1
+      (call $ram.decode (local.get $address) (local.get $offset))
+    )
+  )
+
+  (func $ram.set8 (param $address i32) (param $offset i32) (param $value i32)
+    (i32.store8 offset=296
+      (call $ram.decode (local.get $address) (local.get $offset))
+      (local.get $value)
+    )
+  )
+  (func $ram.get8 (param $address i32) (param $offset i32)
+                  (result i32)
     (i32.load8_s offset=296
+      (call $ram.decode (local.get $address) (local.get $offset))
+    )
+  )
+
+
+  ;; This will increment IP by the given amount.
+  (func $IP.step (param $value i32)
+    (global.set $IP
       (i32.rem_u
-        (local.get $bit)
-        (i32.const 16)
+        (i32.add
+          (global.get $IP)
+          (local.get $value)
+        )
+        (i32.const 65536)
       )
     )
-  ;)
+  )
 
 
   ;; Sets Zero/Sign/Parity flags accordingly to the resulting value from math operations, does not 'Consume' the value.
@@ -424,7 +462,7 @@
               (local.get $operation))
     )
 
-    ;; If the result of an arithmetic operation is larger than (2 ^ 16) - 1) OR the subtrahend is larger than minuend, CF is set to 1; 0 otherwise.
+    ;; If the result of an arithmetic operation equals or is larger than (2 ^ 16/8) OR the subtrahend is larger than minuend, CF is set to 1; 0 otherwise.
     (call $register.flag.set
       (global.get $CF)
       (select (i32.const 1) (select (i32.gt_u (call $i32.neg (local.get $source)) (local.get $destination)) (i32.const 0)                          
@@ -433,7 +471,7 @@
                                                     (local.get $mode))))
     )
     
-    ;; If the result of a signed operation is too large to be represented in 8-Bits, Then OF is set to 1; 0 otherwise.
+    ;; If the result of a signed operation is too large to be represented in 7 or 15 bits (depending on $mode), Then OF is set to 1; 0 otherwise.
     ;; http://teaching.idallen.com/dat2343/10f/notes/040_overflow.txt explains Carry & Overflow flags in a very detailed manner.
     ;; Summarizing, overflow only occurs if both operands have the same sign and it differs from the result's sign.
     (call $register.flag.set
@@ -464,11 +502,12 @@
   )
 
 
-  (; Opcode backends (Commonly used assets across opcodes) ;)
-  ;; a sign-agnostic Binary operation that adds a value (plus an optional carry flag) to a register or memory.
-  ;; As for subtraction, Although it is a "real" instruction at the hardware level (i.e., has it's own binary opcode and the 
+  (; OpCode backends (Commonly used assets across OpCodes) ;)
+  ;; a sign-agnostic Quinary operation that adds a value (plus an optional carry flag) to a register or memory.
+  ;; As for subtraction, Although it is a "real" instruction at the hardware level (i.e., has it's own binary OpCode and the 
   ;; CPU itself will be aware that it should produce result of subtraction), since we are _emulating_ a 8086
   ;; we can reuse the existing $ADD function; we had to take a completely different approach if we were to _simulate_ that CPU.
+  ;;
   ;; $operation indicates whether the operation is a subtraction (1) or an addition (0).
   ;; $mode states a 16-Bit operation (1) or 8-Bit (0).
   (func $ADD (param $mode i32) (param $operation i32) (param $destination i32) (param $source i32) (param $carry i32) 
@@ -487,10 +526,14 @@
   )
 
 
-  (; Opcodes ;)
+  (; OpCodes ;)
   (func $0x00 (; ADD Eb, Gb ;)
     ;;(call $ADD (i32.const 0) (i32.const 0) (global.get ) (global.get ))
-
+    (call $register.general.set8
+      (global.get $AL)
+      (call $ADD (i32.const 0) (i32.const 0) (i32.const 50) (i32.const 250) (i32.const 0))
+    )
+    
   )
   (func $0x01 (; ADD Ev, Gv ;) (;
     i32.const 0
@@ -563,13 +606,13 @@
   )
 
 
-  (; Undocumented or duplicate opcodes ;)
-  ;; Most illegal opcodes would just map to other documented instructions (e.g. 0x60 - 0x6f ==> 0x70 – 0x7f);
+  (; Undocumented or duplicate OpCodes ;)
+  ;; Most illegal OpCodes would just map to other documented instructions (e.g. 0x60 - 0x6f ==> 0x70 – 0x7f);
   ;; while a few others such as 'SALC' actually did something useful.
   ;;
-  ;; However, a real 8086 (or anything earlier than 80186) would do nothing when encountering a truly invalid opcode (hence the nop).
+  ;; However, a real 8086 (or anything earlier than 80186) would do nothing when encountering a truly invalid OpCode (hence the nop).
   ;; This emulator aims to be FULLY compatible only (i.e., no co-processors) with the original 8086, so it supports the 
-  ;; redundant opcodes or others like 'SALC'.  Also, several opcodes (e.g. 0xd8 - 0xdf) are only valid when a co-processor like x87 is present; 
+  ;; redundant OpCodes or others like 'SALC'.  Also, several OpCodes (e.g. 0xd8 - 0xdf) are only valid when a co-processor like x87 is present; 
   ;; but since we are emulating this on fast, modern hardware, and co-processors were very rare and expensive back then; 
   ;; emulating a 8087 is out of this project's scope, and therefore invalid.
   (func $UNDF (; illegal instruction ;)
@@ -580,7 +623,7 @@
     ;; work-in-progress
   )
 
-  ;; this opcode sets AL to 256 if the carry flag is set; 0 otherwise.
+  ;; this OpCode sets AL to 256 if the carry flag is set; 0 otherwise.
   (func $0xd6 (; SALC ;)
     (call $register.general.set8 
       (global.get $AL)
