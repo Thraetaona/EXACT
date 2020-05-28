@@ -100,9 +100,10 @@
             let ram = new Uint8Array(emulator.instance.exports.memory.buffer);
             
             reader.onload = function() {
-              let opcodes = Array.from(new Uint8Array(reader.result));   
-              for (let offset = 0; offset < opcodes.byteLength; offset++) {
-                ram[offset + 296] = opcodes.getUint8(offset);
+              let opcodes = new Uint8Array(reader.result);   
+
+              for (let offset = 0; offset < opcodes.length; offset++) {
+                ram[offset + 296] = opcodes[offset];
               }
             }
             
@@ -110,7 +111,7 @@
 
 
             for (let offset = 0; offset < 3; offset++) {
-              const buttons = document.getElementById("control").children[offset].disabled = false;
+              document.getElementById("control").children[offset].disabled = false;
             }
           }, false);
 

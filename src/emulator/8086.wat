@@ -14,12 +14,75 @@
 ;; You should have received a copy of the GNU General Public License
 ;; along with this program.  If not, see <https://www.gnu.org/licenses/>.
 ;;
-;; Module-level documentation (Overview) resides in the 'README.md' file.
+;; Basic module-level Overview resides in the 'README.md' file.
 ;;
-;; Assemble with 'wat2wasm ./src/emulator/8086.wat -o ./src/emulator/8086.wasm --enable-bulk-memory'
+;; Assemble with 'wat2wasm ./src/emulator/8086.wat -o ./src/emulator/8086.wasm'
 
 
 
+;; WebAssembly's Normative documentation can be confusing at first; given the lack of examples, too, it's best to refer to these links
+;; for questions regarding WASM's text syntax and WebAssembly in general.
+;; (Obviously there are also a number of blog posts and questions on different forums related to WEbAssembly.
+;;  however, this is just a compilation of the most definitive ones)
+;;
+;;
+;; To assembly this text representation, you'll have to use WebAssembly's official toolkit called 'wabt' 
+;; which should already be available in your distribution's repository, alternatively you could locally compile it:
+;; https://github.com/WebAssembly/wabt
+;;
+;; The official testsuite could be useful if all you need is an example of the syntax:
+;; https://github.com/WebAssembly/testsuite/find/master
+;;
+;; The output from the backend of languages that can be compiled to WebAssembly could also assist in debugging:
+;; https://mbebenita.github.io/WasmExplorer/
+;;
+;; All instructions along with their OpCodes and notes are available here:
+;; https://wiki.freepascal.org/WebAssembly/Instructions
+;;
+;; The old WebAssembly documentation explains the purpose of each instruction:
+;; https://webassembly.github.io/spec/core/syntax/instructions.html
+;;
+;; For information about how numbers and values are encoded in WebAssembly:
+;; https://webassembly.github.io/spec/core/binary/values.html
+;; https://en.wikipedia.org/wiki/LEB128
+;;
+;; About memory management and Binary sections:
+;; https://rsms.me/wasm-intro
+;;
+;; It's good to have a look at WebAssembly from these perspectives, too:
+;; http://troubles.md/wasm-is-not-a-stack-machine/
+;; https://www.virusbulletin.com/virusbulletin/2018/10/dark-side-webassembly/
+;;
+;; Also, it's worth mentioning that the text representation underwent some silent changes a while ago (Old syntax is still valid):
+;; https://github.com/WebAssembly/spec/issues/884#issuecomment-426433329
+;;
+;; And lastly, the new normative documentations could be useful once you get more familiar with WebAssembly:
+;; https://webassembly.github.io/spec/core/syntax/instructions.html
+;;
+;;
+;;
+;; As for Intel's 8086, the following sources could be helpful.
+;;
+;;
+;; For undocumented and duplicate OpCodes:
+;; http://www.os2museum.com/wp/undocumented-8086-opcodes/
+;; http://www.os2museum.com/wp/undocumented-8086-opcodes-part-i/
+;; 
+;; Detailed analysis of each instruction:
+;; https://www.gabrielececchetti.it/Teaching/CalcolatoriElettronici/Docs/i8086_instruction_set.pdf
+;; 
+;; OpCode maps (second link covers undocumented ones as well):
+;; http://www.mlsite.net/8086/
+;; https://sandpile.org/x86/opc_1.htm
+;;
+;; Flag registers (including reserved bits):
+;; https://en.wikipedia.org/wiki/FLAGS_register
+;; https://www.geeksforgeeks.org/flag-register-8086-microprocessor/
+;; http://teaching.idallen.com/dat2343/10f/notes/040_overflow.txt
+;;
+;; And finally for difficulties regarding the complicated encoding/decoding process:
+;; http://aturing.umcs.maine.edu/~meadow/courses/cos335/8086-instformat.pdf
+;; https://www.includehelp.com/embedded-system/instruction-format-in-8086-microprocessor.aspx
 (module $cpu
   (; 
    ; Memory Section
@@ -34,7 +97,7 @@
   ;; Be aware that a few _Bytes_ could be saved by using a segmented module along with offsets or branching;
   ;; However, that would significantly lower performance and complicate the codebase with no Reasonable gains.
   ;; Linear memory layout:
-  ;; (Each number represents a byte and each WASM memory page equqls 64KiB.)
+  ;; (numbers represents bytes and each WASM memory page equqls 64KiB.)
   ;;
   ;; [0, 7]         => General registers.
   ;; (7, 15]        => Index registers.
@@ -49,7 +112,7 @@
   (; 
    ; Import Section
    ;)
-  (import "env" "memory" (memory 16 16384))
+  (import "env" "memory" (memory 17 17))
 
 
 
@@ -64,7 +127,7 @@
   (; 
    ; Global Section
    ;)
-  (; These are instantiation-time global _constants_, equivalent to static variables in C and C++, solely for convenience.    ;
+  (; These are instantiation-time global _constants_, equivalent to static variables in C and C++, merely for convenience.    ;
    ; They are accessed through $register.set/get interfaces; to ensure efficient and reliable emulation of decoded registers. ;)
   ;; 16-Bit general purpose registers (Divided into Low / High)
   (global $AX i32 (i32.const 0)) ;; 0; Accumulator (divided into AL / AH)
@@ -113,6 +176,17 @@
   ;; Current opcode that should be executed
   (global $opcode (mut i32) (i32.const 0))
 
+  ;;
+  (global $mod (mut i32) (i32.const 0))
+  ;;
+  (global $reg (mut i32) (i32.const 0))
+  ;;
+  (global $rm (mut i32) (i32.const 0))
+
+  ;;
+  (global $disp (mut i32) (i32.const 0))
+
+
 
   (; 
    ; Data Section
@@ -120,7 +194,7 @@
   ;; Array for holding all registers (Except IP).
   ;;
   ;; WebAssembly is low-endian, although endianness does not matter inside a register, as they are byte-accessible rather than byte-addressable.
-  ;; Also, it appears that the 8086 had some 'reserved' flags that were always(?) set to 1; UD is used to represent those.
+  ;; Also, it appears that the 8086 had some 'reserved' flags that were always(?) set to 1; 'UD' is used to represent those.
   (data $registers (i32.const 0)
     (;[A X]    [C X]   [D  X]    [B X]   Note:"\XLow\XHigh" ;)
     "\00\00" "\00\00" "\00\00" "\00\00"          (; General ;)
@@ -197,7 +271,7 @@
           (global.get $IP))
         )
       )
-      
+      (call $step_ip (i32.const 1))
       (call_indirect (global.get $opcode))
 
   )
@@ -208,14 +282,14 @@
    ; Code Section
    ;)
   (; Helper functions ;)
-  ;; This will invert the supplied value, as if an 'i32.not' instruction existed in WebAssembly.
+  ;; This will invert the supplied value, as if an 'i32.not' instruction existed in WebAssembly (e.g., 32 --> 0).
   (func $i32.not (param $value i32)
                  (result i32)
     (return
       (i32.xor (local.get $value) (i32.const 1))
     )
   )
-  ;; Similar to above, this will negate it's operand.
+  ;; Similar to above, except that this will negate it's operand (e.g., 32 --> -32).
   (func $i32.neg (param $value i32)
                  (result i32)
     (return
@@ -261,12 +335,12 @@
                                   (result i32)
   (block (block (block (block (block (local.get $bit)
             (br_table
-              0 0 0 0   ;; bit == {0, 1, 2, 3} --> (br 0)[0]
-              1         ;; bit == 4 --> (br 4)[1]
-              2         ;; bit == 5 --> (br 5)[3]
-              3         ;; bit == 6 --> (br 6)[5]
-              4         ;; 0 > bit OR result >= 7 --> (br 7 (Default))[7]
-              ))
+              0 0 0 0   ;; bit == [0, 3] --> (br 0)[bit * 2]
+              1         ;; bit == {4} --> (br 1)[1]
+              2         ;; bit == {5} --> (br 2)[3]
+              3         ;; bit == {6} --> (br 3)[5]
+              4         ;; 0 > bit OR result >= 7 --> (br 4 (Default))[7]
+            ))
             ;; Target for (br 0)
             (return (i32.mul (local.get $bit) (i32.const 2))))
           ;; Target for (br 1)
@@ -396,7 +470,7 @@
 
 
   ;; This will increment IP by the given amount.
-  (func $IP.step (param $value i32)
+  (func $step_ip (param $value i32)
     (global.set $IP
       (i32.rem_u
         (i32.add
@@ -409,14 +483,106 @@
   )
 
 
+  ;; 8086 Instruction lengths can vary from 1 (No operands) to 6
+  ;; 8086 Instruction format:
+  ;; 
+  ;; Byte\Bit | 7 | 6 | 5 | 4 | 3 | 2 | 1 | 0 |
+  ;; ---------|-----------------------|---|---|-
+  ;;     1    |         opcode        | d | w | Opcode byte
+  ;;     2    |  mod  |    reg    |    r/m    | Addressing mode byte
+  ;;     3    |           [optional]          | low disp, addr, or data
+  ;;     4    |           [optional]          | high disp, addr, or data
+  ;;     5    |           [optional]          | low data
+  ;;     6    |           [optional]          | high data
+  ;;
+  ;;
+  ;;
+  (func $modregrm
+    (global.set $address
+      (call $ram.get8 (call $register.segment.get (global.get $CS)) (global.get $IP))
+    )
+    (call $step_ip (i32.const 1))
+
+    (global.set $mod
+      (i32.shr_u (global.get $address) (i32.const 6))
+    )
+    (global.set $reg 
+      (i32.and
+        (i32.shr_u (global.get $address) (i32.const 3))
+        (i32.const 7)
+      )
+    )
+    (global.set $rm
+      (i32.shr_u (global.get $address) (i32.const 7))
+    )
+
+    (block (block (block (block (global.get $mod)
+          (br_table
+              0 ;; mod == {0} --> (br 0)
+              1 ;; mod == {1} --> (br 1)
+              2 ;; mod == {2} --> (br 2)
+              3 ;; 0 > bit OR result >= 3 --> (br 3 (Default))
+            ))
+          ;; Target for (br 0)
+          (if (i32.eq (global.get $rm) (i32.const 6))
+            (global.set $disp
+              (call $ram.get16 (call $register.segment.get (global.get $CS)) (global.get $IP))
+            )
+            (call $step_ip (i32.const 2))
+          ) 
+          (else (if (i32.xor (i32.eq (global.get $rm) (i32.const 2)) (i32.eq (global.get $rm) (i32.const 3)))
+
+          ))
+          )
+        ;; Target for (br 1)
+        (return (i32.const 1)))
+      ;; Target for (br 2)
+      (return (i32.const 3)))
+    ;; (Default) Target for (br 3)
+    (return (i32.const 3))
+
+    switch(mode) \
+    { \
+    case 0: \
+    if(rm == 6) { \
+    disp16 = getmem16(segregs[regcs], ip); \
+    StepIP(2); \
+    } \
+    if(((rm == 2) || (rm == 3)) && !segoverride) { \
+    useseg = segregs[regss]; \
+    } \
+    break; \
+  \
+    case 1: \
+    disp16 = signext(getmem8(segregs[regcs], ip)); \
+    StepIP(1); \
+    if(((rm == 2) || (rm == 3) || (rm == 6)) && !segoverride) { \
+    useseg = segregs[regss]; \
+    } \
+    break; \
+  \
+    case 2: \
+    disp16 = getmem16(segregs[regcs], ip); \
+    StepIP(2); \
+    if(((rm == 2) || (rm == 3) || (rm == 6)) && !segoverride) { \
+    useseg = segregs[regss]; \
+    } \
+    break; \
+  \
+    default: \
+    disp8 = 0; \
+    disp16 = 0; \
+    } \
+  )
+
+
   ;; Sets Zero/Sign/Parity flags accordingly to the resulting value from math operations, does not 'Consume' the value.
   (func $set_zsp (param $value i32) 
                  (result i32)
     ;; If the value equals 0 then ZF is set to 1; 0 otherwise.
     (call $register.flag.set
       (global.get $ZF)
-      (select (i32.const 0) (i32.const 1)
-              (local.get $value))
+      (call $i32.not (local.get $value))
     )
 
     ;; If the high-order bit of the value is a 1 then SF is set to 1; 0 otherwise. (Two's complement notation)
@@ -503,14 +669,14 @@
 
 
   (; OpCode backends (Commonly used assets across OpCodes) ;)
-  ;; a sign-agnostic Quinary operation that adds a value (plus an optional carry flag) to a register or memory.
-  ;; As for subtraction, Although it is a "real" instruction at the hardware level (i.e., has it's own binary OpCode and the 
+  ;; a sign-agnostic Quinary operation that adds a value (plus an optional carry flag) to another.
+  ;; As for subtraction, Although it is a "real" instruction at the hardware level (i.e., SUB has it's own binary OpCode and the 
   ;; CPU itself will be aware that it should produce result of subtraction), since we are _emulating_ a 8086
   ;; we can reuse the existing $ADD function; we had to take a completely different approach if we were to _simulate_ that CPU.
   ;;
   ;; $operation indicates whether the operation is a subtraction (1) or an addition (0).
   ;; $mode states a 16-Bit operation (1) or 8-Bit (0).
-  (func $ADD (param $mode i32) (param $operation i32) (param $destination i32) (param $source i32) (param $carry i32) 
+  (func $ADD (param $mode i32) (param $operation i32) (param $carry i32) (param $destination i32) (param $source i32)
              (result i32)
     (i32.add
       (i32.add (local.get $destination) (select (call $i32.neg (local.get $source)) (local.get $source)
@@ -528,10 +694,9 @@
 
   (; OpCodes ;)
   (func $0x00 (; ADD Eb, Gb ;)
-    ;;(call $ADD (i32.const 0) (i32.const 0) (global.get ) (global.get ))
     (call $register.general.set8
       (global.get $AL)
-      (call $ADD (i32.const 0) (i32.const 0) (i32.const 50) (i32.const 250) (i32.const 0))
+      (call $ADD (i32.const 0) (i32.const 0) (i32.const 0) (i32.const 50) (i32.const 250))
     )
     
   )
