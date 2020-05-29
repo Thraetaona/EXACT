@@ -94,16 +94,19 @@
 
         await WebAssembly.instantiateStreaming(fetch('./emulator/8086.wasm'), imports)
         .then(async emulator => {
+          let programLength;
+          
           document.getElementById('upload').addEventListener('change', function(uploaded) {
             let file = uploaded.target.files[0];
             let reader = new FileReader();
             let ram = new Uint8Array(emulator.instance.exports.memory.buffer);
-            
+
             reader.onload = function() {
               let opcodes = new Uint8Array(reader.result);   
+              programLength = opcodes.length;
 
-              for (let offset = 0; offset < opcodes.length; offset++) {
-                ram[offset + 296] = opcodes[offset];
+              for (let offset = 0; offset < programLength; offset++) {
+                ram[offset + 40] = opcodes[offset];
               }
             }
             
@@ -116,7 +119,7 @@
           }, false);
 
           document.getElementById('run').addEventListener('click', function() {
-            emulator.instance.exports.start();
+            emulator.instance.exports.execute(programLength);
           }, false);
 
           window.setInterval(function(){

@@ -70,7 +70,8 @@
 ;; 
 ;; Detailed analysis of each instruction:
 ;; https://www.gabrielececchetti.it/Teaching/CalcolatoriElettronici/Docs/i8086_instruction_set.pdf
-;; 
+;; https://en.wikipedia.org/wiki/X86_instruction_listings?#Original_8086/8088_instructions 
+;;
 ;; OpCode maps (second link covers undocumented ones as well):
 ;; http://www.mlsite.net/8086/
 ;; https://sandpile.org/x86/opc_1.htm
@@ -80,9 +81,11 @@
 ;; https://www.geeksforgeeks.org/flag-register-8086-microprocessor/
 ;; http://teaching.idallen.com/dat2343/10f/notes/040_overflow.txt
 ;;
-;; And finally for difficulties regarding the complicated encoding/decoding process:
+;; finally, for difficulties regarding the complicated encoding/decoding process:
 ;; http://aturing.umcs.maine.edu/~meadow/courses/cos335/8086-instformat.pdf
 ;; https://www.includehelp.com/embedded-system/instruction-format-in-8086-microprocessor.aspx
+;; https://www.ic.unicamp.br/~celio/mc404s2-03/addr_modes/intel_addr.html#HEADING2-35
+;; https://en.wikipedia.org/wiki/Intel_8086
 (module $cpu
   (; 
    ; Memory Section
@@ -94,7 +97,9 @@
   ;; just as a real, physical 8086 would.
   ;;
   ;;
-  ;; Be aware that a few _Bytes_ could be saved by using a segmented module along with offsets or branching;
+  ;; This entire module on it's own should only be using less than 40 bytes of linear memory which is only a fraction
+  ;; of what's specified above (17 pages), the majority of it is dedicated to the 1MiB of RAM for emulating User programs.
+  ;; Be aware that even a few _Bytes_ could be saved by using a segmented module along with offsets or branching;
   ;; However, that would significantly lower performance and complicate the codebase with no Reasonable gains.
   ;; Linear memory layout:
   ;; (numbers represents bytes and each WASM memory page equqls 64KiB.)
@@ -103,9 +108,7 @@
   ;; (7, 15]        => Index registers.
   ;; (15, 23]       => Segment registers.
   ;; (23, 39]       => Flag registers.
-  ;; (39, 295]      => Array holding OpCode lengths.
-  ;; (295, 1048871] => 1Mib of Random-access memory.
-  ;; (1048871, ] => 
+  ;; (39, 1048615]  => 1Mib of Random-access memory.
 
 
 
@@ -119,7 +122,7 @@
   (; 
    ; Export Section
    ;)
-  (export "start" (func $start))
+  (export "execute" (func $execute))
   (export "memory" (memory 0))
   (export "IP" (global $IP))
 
@@ -130,31 +133,31 @@
   (; These are instantiation-time global _constants_, equivalent to static variables in C and C++, merely for convenience.    ;
    ; They are accessed through $register.set/get interfaces; to ensure efficient and reliable emulation of decoded registers. ;)
   ;; 16-Bit general purpose registers (Divided into Low / High)
-  (global $AX i32 (i32.const 0)) ;; 0; Accumulator (divided into AL / AH)
-  (global $CX i32 (i32.const 1)) ;; 1; Count (divided into CL / CH)
-  (global $DX i32 (i32.const 2)) ;; 2; Data (divided into DL / DH)
-  (global $BX i32 (i32.const 3)) ;; 3; Base (divided into BL / BH)
+  (global $AX i32 (i32.const 0)) ;; 000b; Accumulator (divided into AL / AH)
+  (global $CX i32 (i32.const 1)) ;; 001b; Count (divided into CL / CH)
+  (global $DX i32 (i32.const 2)) ;; 010b; Data (divided into DL / DH)
+  (global $BX i32 (i32.const 3)) ;; 011b; Base (divided into BL / BH)
   ;; 16-Bit Index registers 
-  (global $SP i32 (i32.const 4)) ;; 4; Stack pointer 
-  (global $BP i32 (i32.const 5)) ;; 5; Base pointer 
-  (global $SI i32 (i32.const 6)) ;; 6; Source index
-  (global $DI i32 (i32.const 7)) ;; 7; Destination index
+  (global $SP i32 (i32.const 4)) ;; 100b; Stack pointer 
+  (global $BP i32 (i32.const 5)) ;; 101b; Base pointer 
+  (global $SI i32 (i32.const 6)) ;; 110b; Source index
+  (global $DI i32 (i32.const 7)) ;; 111b; Destination index
 
   ;; 8-Bit decoded general purpose registers
-  (global $AL i32 (i32.const 0)) ;; 0; Accumulator low
-  (global $CL i32 (i32.const 1)) ;; 1; Count low
-  (global $DL i32 (i32.const 2)) ;; 2; Data low
-  (global $BL i32 (i32.const 3)) ;; 3; Base low
-  (global $AH i32 (i32.const 4)) ;; 4; Accumulator High
-  (global $CH i32 (i32.const 5)) ;; 5; Count High
-  (global $DH i32 (i32.const 6)) ;; 6; Data High
-  (global $BH i32 (i32.const 7)) ;; 7; Base high
+  (global $AL i32 (i32.const 0)) ;; 000b; Accumulator low
+  (global $CL i32 (i32.const 1)) ;; 001b; Count low
+  (global $DL i32 (i32.const 2)) ;; 010b; Data low
+  (global $BL i32 (i32.const 3)) ;; 011b; Base low
+  (global $AH i32 (i32.const 4)) ;; 100b; Accumulator High
+  (global $CH i32 (i32.const 5)) ;; 101b; Count High
+  (global $DH i32 (i32.const 6)) ;; 110b; Data High
+  (global $BH i32 (i32.const 7)) ;; 111b; Base high
 
   ;; Segment registers
-  (global $ES i32 (i32.const 0)) ;; 0; Extra segment
-  (global $CS i32 (i32.const 1)) ;; 1; Code segment
-  (global $SS i32 (i32.const 2)) ;; 2; Stack segment
-  (global $DS i32 (i32.const 3)) ;; 3; Data segment
+  (global $ES i32 (i32.const 0)) ;; 00b; Extra segment
+  (global $CS i32 (i32.const 1)) ;; 01b; Code segment
+  (global $SS i32 (i32.const 2)) ;; 10b; Stack segment
+  (global $DS i32 (i32.const 3)) ;; 11b; Data segment
 
   ;; Status Flag Registers
   (global $CF i32 (i32.const 0)) ;; bit 0; Carry (Borrow) flag
@@ -176,15 +179,15 @@
   ;; Current opcode that should be executed
   (global $opcode (mut i32) (i32.const 0))
 
-  ;;
-  (global $mod (mut i32) (i32.const 0))
-  ;;
-  (global $reg (mut i32) (i32.const 0))
-  ;;
-  (global $rm (mut i32) (i32.const 0))
+  ;; Mod|Reg|R/M that is extracted from the byte following an OpCode with a length higher than 1 (Refer to the $modregrm function for further information)
+  (global $mod (mut i32) (i32.const 0)) ;; mode, varies from 00b to 11b
+  (global $reg (mut i32) (i32.const 0)) ;; reg, Should range from 000b to 111b
+  (global $rm (mut i32) (i32.const 0)) ;; r/m, Like above, a value that is 000b to 111b
 
-  ;;
-  (global $disp (mut i32) (i32.const 0))
+  (global $seg (mut i32) (i32.const 3)) ;; Current segment override (Only if seg_override is set)
+  (global $seg_override (mut i32) (i32.const 0)) ;; Indicates whether $seg's value should be used instead of the default Data Segment
+
+  (global $ea (mut i32) (i32.const 0)) ;; Effective Address calculated using the $get_ea function
 
 
 
@@ -197,6 +200,7 @@
   ;; Also, it appears that the 8086 had some 'reserved' flags that were always(?) set to 1; 'UD' is used to represent those.
   (data $registers (i32.const 0)
     (;[A X]    [C X]   [D  X]    [B X]   Note:"\XLow\XHigh" ;)
+    (;AL\BL    CL\CH    DL\DH    BL\BH                      ;)
     "\00\00" "\00\00" "\00\00" "\00\00"          (; General ;)
     (;[S P]    [B P]   [S  I]    [D I]                      ;)
     "\00\00" "\00\00" "\00\00" "\00\00"          (;  Index  ;)
@@ -208,29 +212,8 @@
     "\00" "\00" "\00" "\00" "\01" "\01" "\01" "\01" (; Flag ;)
   )
 
-  ;; Array for holding opcode lengths.
-  (data $opcode_lenghts (i32.const 40)
-    (; 0     1     2     3     4     5     6     7     8     9     A     B     C     D     E     F     / ;)
-    "\02" "\01" "\01" "\01" "\01" "\01" "\01" "\01" "\01" "\01" "\01" "\01" "\01" "\01" "\01" "\01" (; 0 ;)
-    "\01" "\01" "\01" "\01" "\01" "\01" "\01" "\01" "\01" "\01" "\01" "\01" "\01" "\01" "\01" "\01" (; 1 ;)
-    "\01" "\01" "\01" "\01" "\01" "\01" "\01" "\01" "\01" "\01" "\01" "\01" "\01" "\01" "\01" "\01" (; 2 ;)
-    "\01" "\01" "\01" "\01" "\01" "\01" "\01" "\01" "\01" "\01" "\01" "\01" "\01" "\01" "\01" "\01" (; 3 ;)
-    "\01" "\01" "\01" "\01" "\01" "\01" "\01" "\01" "\01" "\01" "\01" "\01" "\01" "\01" "\01" "\01" (; 4 ;)
-    "\01" "\01" "\01" "\01" "\01" "\01" "\01" "\01" "\01" "\01" "\01" "\01" "\01" "\01" "\01" "\01" (; 5 ;)
-    "\01" "\01" "\01" "\01" "\01" "\01" "\01" "\01" "\01" "\01" "\01" "\01" "\01" "\01" "\01" "\01" (; 6 ;)
-    "\01" "\01" "\01" "\01" "\01" "\01" "\01" "\01" "\01" "\01" "\01" "\01" "\01" "\01" "\01" "\01" (; 7 ;)
-    "\01" "\01" "\01" "\01" "\01" "\01" "\01" "\01" "\01" "\01" "\01" "\01" "\01" "\01" "\01" "\01" (; 8 ;)
-    "\01" "\01" "\01" "\01" "\01" "\01" "\01" "\01" "\01" "\01" "\01" "\01" "\01" "\01" "\01" "\01" (; 9 ;)
-    "\01" "\01" "\01" "\01" "\01" "\01" "\01" "\01" "\01" "\01" "\01" "\01" "\01" "\01" "\01" "\01" (; A ;)
-    "\01" "\01" "\01" "\01" "\01" "\01" "\01" "\01" "\01" "\01" "\01" "\01" "\01" "\01" "\01" "\01" (; B ;)
-    "\01" "\01" "\01" "\01" "\01" "\01" "\01" "\01" "\01" "\01" "\01" "\01" "\01" "\01" "\01" "\01" (; C ;)
-    "\01" "\01" "\01" "\01" "\01" "\01" "\01" "\01" "\01" "\01" "\01" "\01" "\01" "\01" "\01" "\01" (; D ;)
-    "\01" "\01" "\01" "\01" "\01" "\01" "\01" "\01" "\01" "\01" "\01" "\01" "\01" "\01" "\01" "\01" (; E ;)
-    "\01" "\01" "\01" "\01" "\01" "\01" "\01" "\01" "\01" "\01" "\01" "\01" "\01" "\01" "\01" "\01" (; F ;)
-  )
-
   ;; 1Mib of Random-access memory.
-  (data $ram (i32.const 296)
+  (data $ram (i32.const 40)
   )
 
 
@@ -264,14 +247,14 @@
   (; 
    ; Start & Main Section
    ;)
-  (func $start
+  (func $execute (param $program_length i32)
       (global.set $opcode 
-        (call $ram.get8 
-          (call $register.flag.get (global.get $CS) 
-          (global.get $IP))
-        )
+        (call $ram.get8 (call $register.flag.get (global.get $CS)) (global.get $IP))
       )
-      (call $step_ip (i32.const 1))
+
+            (call $step_ip (i32.const 1))
+    (call $register.general.set8 (global.get $AL) (i32.const 20))
+    
       (call_indirect (global.get $opcode))
 
   )
@@ -415,21 +398,10 @@
       )
     )
   )
-  
-
-  ;; Returns the length of the specified opcode.
-  (func $opcode_lenghts.fetch (param $opcode i32) 
-                              (result i32)
-    (i32.load8_u offset=40
-      (i32.rem_u
-        (local.get $opcode)
-        (i32.const 256)
-      )
-    )
-  )
 
 
   (; Interfaces to work with RAM, available in 16 and 8 bit variants. ;)
+  ;; This will calculate a physical address from a logical one.
   (func $ram.decode (param $address i32) (param $offset i32)
                     (result i32)
   (return
@@ -442,30 +414,103 @@
       )
     )                  
   )
+  ;; Stores a 16-Bit value in a given logical address.
   (func $ram.set16 (param $address i32) (param $offset i32) (param $value i32)
-    (i32.store16 offset=296 align=1
+    (i32.store16 offset=40 align=1
       (call $ram.decode (local.get $address) (local.get $offset))
       (local.get $value)
     )
   )
+  ;; Retrieves a 16-Bit value from the specified logical address.
   (func $ram.get16 (param $address i32) (param $offset i32)
                    (result i32)
-    (i32.load16_s offset=296 align=1
+    (i32.load16_s offset=40 align=1
       (call $ram.decode (local.get $address) (local.get $offset))
     )
   )
 
+  ;; Stores a 8-Bit value in a given logical address.
   (func $ram.set8 (param $address i32) (param $offset i32) (param $value i32)
-    (i32.store8 offset=296
+    (i32.store8 offset=40
       (call $ram.decode (local.get $address) (local.get $offset))
       (local.get $value)
     )
   )
+  ;; Retrieves a 8-Bit value from the specified logical address.
   (func $ram.get8 (param $address i32) (param $offset i32)
                   (result i32)
-    (i32.load8_s offset=296
+    (i32.load8_s offset=40
       (call $ram.decode (local.get $address) (local.get $offset))
     )
+  )
+
+
+  (; These functions are no different from the above ones; except that their operand can be either          ;
+   ; (1) a direct Phyiscal Address or (2) a General Register; rather than strictly accepting one type only. ;
+   ; Deciding whether it should write to a register of memory is done through checking the value of $mod.   ;)
+  ;; Writes a 16-Bit value to a 16-Bit destination.
+  (func $logical_write16 (param $address i32) (param $value i32)
+    (if (i32.lt_u (global.get $mod) (i32.const 3)) (then
+      (i32.store16 offset=40 align=1
+        (i32.mul
+          (i32.and (local.get $address) (i32.const 1048560))
+          (i32.const 2)
+        )
+        (local.get $value)
+      )
+    )
+    (else
+      (call $register.general.set16
+        (local.get $address)
+        (local.get $value)
+      )
+    ))
+  )
+  ;; Writes a 8-Bit value to a 8-Bit destination.
+  (func $logical_read16 (param $address i32)
+                        (result i32)
+    (if (result i32) (i32.lt_u (global.get $mod) (i32.const 3)) (then
+      (i32.load16_s offset=40 align=1
+        (i32.mul
+          (i32.and (local.get $address) (i32.const 1048560))
+          (i32.const 2)
+        )
+      )
+    )
+    (else
+      (call $register.general.get16 (local.get $address))
+    ))
+  )
+
+  ;; Reads a 16-Bit value from a 16-Bit destination.
+  (func $logical_write8 (param $address i32) (param $value i32)
+    (if (i32.lt_u (global.get $mod) (i32.const 3)) (then
+      (i32.store8
+        (i32.and (local.get $address) (i32.const 1048560))
+        (local.get $value)
+      )
+    )
+    (else
+      (call $register.general.set8
+        (local.get $address)
+        (local.get $value)
+      )
+    ))
+  )
+  ;; Reads a 8-Bit value from a 8-Bit destination.
+  (func $logical_read8 (param $address i32)
+                       (result i32)
+    (if (result i32) (i32.lt_u (global.get $mod) (i32.const 3)) (then
+      (i32.load8_s
+        (i32.and
+          (local.get $address)
+          (i32.const 1048560)
+        )
+      )
+    )
+    (else
+      (call $register.general.get8 (local.get $address))
+    ))
   )
 
 
@@ -483,7 +528,294 @@
   )
 
 
-  ;; 8086 Instruction lengths can vary from 1 (No operands) to 6
+  ;; An inline function that calculates the effective address based on the content's of $mod and $rm.
+  ;; $moderegrm has to be called before this; otherwise this may return an incorrect address.
+  ;; It uses multiple nested jump tables internally.  Also, it writes the result to a temporary
+  ;; variable first so that there won't be any unnecessary writes to a global variable.
+  ;;
+  ;; https://www.ic.unicamp.br/~celio/mc404s2-03/addr_modes/intel_addr.html#HEADING2-35
+  ;; In general, addressing modes involving $BP will use the Data Segment by default; Stack Segment otherwise.
+  ;; The above rule only applies when there are no segment overrides, however.
+  ;;
+  ;; It's worth mentioning that $get_ea will only calculate a new address if $mod is less than 11b,
+  ;; considering that 11b is dedicated to the 'REG table' and it should be already present in the $rm field.
+  ;;
+  ;; And lastly, this function has been optimized for speed, neither for memory usage nor code density. 
+  (func $get_ea (local $temp_address i32)
+    (block (block (block (block (global.get $mod)
+          (br_table
+              0 ;; mod == {0} --> (br 0)[R/M table 1 with R/M operand]
+              1 ;; mod == {1} --> (br 1)[R/M table 2 with 8-Bit displacement]
+              2 ;; mod == {2} --> (br 2)[R/M table 3 with 16-Bit displacement]
+              3 ;; 0 > bit OR result >= 3 --> (br 3 (Default))[REG table]
+            ))
+          ;; Mod target for (br 0)
+            (; R/M table 1 with R/M operand ;)
+              (block (block (block (block (block (block (block (block (global.get $rm)
+                            (br_table
+                              0 ;; rm == {0} --> (br 0)
+                              1 ;; rm == {1} --> (br 1)
+                              2 ;; rm == {2} --> (br 2)[Involves BP]
+                              3 ;; rm == {3} --> (br 3)[Involves BP]
+                              4 ;; rm == {4} --> (br 4)
+                              5 ;; rm == {5} --> (br 5)
+                              6 ;; rm == {6} --> (br 6)
+                              7 ;; 0 > bit OR result >= 7 --> (br 7 (Default))
+                            ))
+                          ;; R/M table 1 with R/M operand for (br 0)
+                          (local.set $temp_address (i32.add 
+                            (call $register.general.get16 (global.get $BX))
+                            (call $register.general.get16 (global.get $SI))
+                          )))
+                        ;; R/M table 1 with R/M operand for (br 1)
+                        (local.set $temp_address (i32.add 
+                          (call $register.general.get16 (global.get $BX))
+                          (call $register.general.get16 (global.get $DI))
+                        )))
+                      ;; R/M table 1 with R/M operand for (br 2)
+                      (block 
+                        (local.set $temp_address (i32.add 
+                          (call $register.general.get16 (global.get $BP))
+                          (call $register.general.get16 (global.get $SI))
+                        ))
+                        (if (call $i32.not (global.get $seg_override))
+                          (global.set $seg (call $register.segment.get (global.get $SS)))
+                        )
+                      ))
+                    ;; R/M table 1 with R/M operand for (br 3)
+                    (block 
+                      (local.set $temp_address (i32.add 
+                        (call $register.general.get16 (global.get $BP))
+                        (call $register.general.get16 (global.get $DI))
+                      ))
+                      (if (call $i32.not (global.get $seg_override))
+                        (global.set $seg (call $register.segment.get (global.get $SS)))
+                      )
+                    ))
+                  ;; R/M table 1 with R/M operand for (br 4)
+                  (local.set $temp_address (global.get $SI)))
+                ;; R/M table 1 with R/M operand for (br 5)
+                (local.set $temp_address (global.get $DI)))
+              ;; R/M table 1 with R/M operand for (br 6)
+              (block
+                (local.set $temp_address
+                  (call $ram.get16 (call $register.segment.get (global.get $CS)) (global.get $IP))
+                )
+                (call $step_ip (i32.const 2)) ;; Fetching a 16-Bit displacement should increment $IP by 2.
+              ))
+            ;; (default) R/M table 1 with R/M operand for (br 7)
+            (local.set $temp_address (global.get $BX)))
+          (; R/M table 1 with R/M operand ;)
+        ;; Mod target for (br 1)
+          (; R/M table 2 with 8-Bit displacement ;)
+            (block (block (block (block (block (block (block (block (global.get $rm)
+                          (br_table
+                            0 ;; rm == {0} --> (br 0)
+                            1 ;; rm == {1} --> (br 1)
+                            2 ;; rm == {2} --> (br 2)[Involves BP]
+                            3 ;; rm == {3} --> (br 3)[Involves BP]
+                            4 ;; rm == {4} --> (br 4)
+                            5 ;; rm == {5} --> (br 5)
+                            6 ;; rm == {6} --> (br 6)[Involves BP]
+                            7 ;; 0 > bit OR result >= 7 --> (br 7 (Default))
+                          ))
+                        ;; R/M table 2 with 8-Bit displacement for (br 0)
+                        (block
+                          (local.set $temp_address (i32.add
+                            (i32.add
+                              (call $register.general.get16 (global.get $BX))
+                              (call $register.general.get16 (global.get $SI))
+                            )
+                            (call $ram.get8 (call $register.segment.get (global.get $CS)) (global.get $IP))
+                          ))
+                          (call $step_ip (i32.const 1))
+                        ))
+                      ;; R/M table 2 with 8-Bit displacement for (br 1)
+                      (block
+                        (local.set $temp_address (i32.add
+                          (i32.add
+                            (call $register.general.get16 (global.get $BX))
+                            (call $register.general.get16 (global.get $DI))
+                          )
+                          (call $ram.get8 (call $register.segment.get (global.get $CS)) (global.get $IP))
+                        ))
+                        (call $step_ip (i32.const 1))
+                      ))
+                    ;; R/M table 2 with 8-Bit displacement for (br 2)
+                    (block
+                      (local.set $temp_address (i32.add
+                        (i32.add
+                          (call $register.general.get16 (global.get $BP))
+                          (call $register.general.get16 (global.get $SI))
+                        )
+                        (call $ram.get8 (call $register.segment.get (global.get $CS)) (global.get $IP))
+                      ))
+                      (call $step_ip (i32.const 1))
+                      (if (call $i32.not (global.get $seg_override))
+                        (global.set $seg (call $register.segment.get (global.get $SS)))
+                      )
+                    ))
+                  ;; R/M table 2 with 8-Bit displacement (br 3)
+                  (block 
+                    (local.set $temp_address (i32.add
+                      (i32.add
+                        (call $register.general.get16 (global.get $BP))
+                        (call $register.general.get16 (global.get $DI))
+                      )
+                      (call $ram.get8 (call $register.segment.get (global.get $CS)) (global.get $IP))
+                    ))
+                    (call $step_ip (i32.const 1))
+                    (if (call $i32.not (global.get $seg_override))
+                      (global.set $seg (call $register.segment.get (global.get $SS)))
+                    )
+                  ))
+                ;; R/M table 2 with 8-Bit displacement for (br 4)
+                (block 
+                  (local.set $temp_address (i32.add
+                    (global.get $SI)
+                    (call $ram.get8 (call $register.segment.get (global.get $CS)) (global.get $IP))
+                  ))
+                  (call $step_ip (i32.const 1))
+                ))
+              ;; R/M table 2 with 8-Bit displacement for (br 5)
+              (block 
+                (local.set $temp_address (i32.add
+                  (global.get $DI)
+                  (call $ram.get8 (call $register.segment.get (global.get $CS)) (global.get $IP))
+                ))
+                (call $step_ip (i32.const 1))
+              ))
+            ;; R/M table 2 with 8-Bit displacement for (br 6)
+            (block 
+              (local.set $temp_address (i32.add
+                (global.get $BP)
+                (call $ram.get8 (call $register.segment.get (global.get $CS)) (global.get $IP))
+              ))
+              (call $step_ip (i32.const 1))
+              (if (call $i32.not (global.get $seg_override))
+                      (global.set $seg (call $register.segment.get (global.get $SS)))
+              )
+            ))
+          ;; (default) R/M table 2 with 8-Bit displacement for (br 7)
+          (block 
+            (local.set $temp_address (i32.add
+              (global.get $BX)
+              (call $ram.get8 (call $register.segment.get (global.get $CS)) (global.get $IP))
+            ))
+            (call $step_ip (i32.const 1))
+          ))
+        (; R/M table 2 with 8-Bit displacement ;)
+      ;; Mod target for (br 2)
+        (; R/M table 3 with 16-Bit displacement ;)
+          (block (block (block (block (block (block (block (block (global.get $rm)
+                        (br_table
+                          0 ;; rm == {0} --> (br 0)
+                          1 ;; rm == {1} --> (br 1)
+                          2 ;; rm == {2} --> (br 2)[Involves BP]
+                          3 ;; rm == {3} --> (br 3)[Involves BP]
+                          4 ;; rm == {4} --> (br 4)
+                          5 ;; rm == {5} --> (br 5)
+                          6 ;; rm == {6} --> (br 6)[Involves BP]
+                          7 ;; 0 > bit OR result >= 7 --> (br 7 (Default))
+                        ))
+                      ;; R/M table 3 with 16-Bit displacement for (br 0)
+                      (block
+                        (local.set $temp_address (i32.add
+                          (i32.add
+                            (call $register.general.get16 (global.get $BX))
+                            (call $register.general.get16 (global.get $SI))
+                          )
+                          (call $ram.get16 (call $register.segment.get (global.get $CS)) (global.get $IP))
+                        ))
+                        (call $step_ip (i32.const 2))
+                      ))
+                    ;; R/M table 3 with 16-Bit displacement for (br 1)
+                    (block
+                      (local.set $temp_address (i32.add
+                        (i32.add
+                          (call $register.general.get16 (global.get $BX))
+                          (call $register.general.get16 (global.get $DI))
+                        )
+                        (call $ram.get16 (call $register.segment.get (global.get $CS)) (global.get $IP))
+                      ))
+                      (call $step_ip (i32.const 2))
+                    ))
+                  ;; R/M table 3 with 16-Bit displacement for (br 2)
+                  (block
+                    (local.set $temp_address (i32.add
+                      (i32.add
+                        (call $register.general.get16 (global.get $BP))
+                        (call $register.general.get16 (global.get $SI))
+                      )
+                      (call $ram.get16 (call $register.segment.get (global.get $CS)) (global.get $IP))
+                    ))
+                    (call $step_ip (i32.const 2))
+                    (if (call $i32.not (global.get $seg_override))
+                      (global.set $seg (call $register.segment.get (global.get $SS)))
+                    )
+                  ))
+                ;; R/M table 3 with 16-Bit displacement (br 3)
+                (block 
+                  (local.set $temp_address (i32.add
+                    (i32.add
+                      (call $register.general.get16 (global.get $BP))
+                      (call $register.general.get16 (global.get $DI))
+                    )
+                    (call $ram.get16 (call $register.segment.get (global.get $CS)) (global.get $IP))
+                  ))
+                  (call $step_ip (i32.const 2))
+                  (if (call $i32.not (global.get $seg_override))
+                    (global.set $seg (call $register.segment.get (global.get $SS)))
+                  )
+                ))
+              ;; R/M table 3 with 16-Bit displacement for (br 4)
+              (block 
+                (local.set $temp_address (i32.add
+                  (global.get $SI)
+                  (call $ram.get16 (call $register.segment.get (global.get $CS)) (global.get $IP))
+                ))
+                (call $step_ip (i32.const 2))
+              ))
+            ;; R/M table 3 with 16-Bit displacement for (br 5)
+            (block 
+              (local.set $temp_address (i32.add
+                (global.get $DI)
+                (call $ram.get16 (call $register.segment.get (global.get $CS)) (global.get $IP))
+              ))
+              (call $step_ip (i32.const 2))
+            ))
+          ;; R/M table 3 with 16-Bit displacement for (br 6)
+          (block 
+            (local.set $temp_address (i32.add
+              (global.get $BP)
+              (call $ram.get16 (call $register.segment.get (global.get $CS)) (global.get $IP))
+            ))
+            (call $step_ip (i32.const 2))
+            (if (call $i32.not (global.get $seg_override))
+                    (global.set $seg (call $register.segment.get (global.get $SS)))
+            )
+          ))
+        ;; (default) R/M table 3 with 16-Bit displacement for (br 7)
+        (block 
+          (local.set $temp_address (i32.add
+            (global.get $BX)
+            (call $ram.get16 (call $register.segment.get (global.get $CS)) (global.get $IP))
+          ))
+          (call $step_ip (i32.const 2))
+        ))
+      (; R/M table 3 with 16-Bit displacement ;)
+    ;; (Default) Mod target for (br 3)
+    (block 
+      (global.set $ea (global.get $ea)
+      (return)
+    )) ;; If mod equals 11b then there is no meaningful need for $get_ea to run,
+                                      ;; so it simply returns the previous value of $ea.
+    (global.set $ea
+      (call $ram.decode (local.get $temp_address) (global.get $seg))
+    )
+  )
+
+  ;; 8086 OpCode lengths can vary from 1 (No operands) to 6
   ;; 8086 Instruction format:
   ;; 
   ;; Byte\Bit | 7 | 6 | 5 | 4 | 3 | 2 | 1 | 0 |
@@ -495,51 +827,35 @@
   ;;     5    |           [optional]          | low data
   ;;     6    |           [optional]          | high data
   ;;
+  ;; (http://aturing.umcs.maine.edu/~meadow/courses/cos335/8086-instformat.pdf)
   ;;
+  ;; Registers that have a length higher than 1 will be followed by a Mod|Reg|R/M Byte.
+  ;; The said byte should provide us with sufficient info to decide what kind of operation
+  ;; we are dealing with and to create an Effective Address if required.
   ;;
-  (func $modregrm
-    (global.set $address
+  ;; This function will extract individual fields from that byte.  Handling the creation
+  ;; of our Effective Address is done inside of $get_ea.
+  (func $modregrm (local $address i32)
+    (local.set $address
       (call $ram.get8 (call $register.segment.get (global.get $CS)) (global.get $IP))
     )
-    (call $step_ip (i32.const 1))
+    (call $step_ip (i32.const 1)) ;; $IP has to be incremented by 1 after fetching the byte containg Mod|Reg|R/M.
 
-    (global.set $mod
-      (i32.shr_u (global.get $address) (i32.const 6))
+    ;; The following fields will extract Mod, Reg and R/M from the previously fetched byte.
+    (global.set $rm
+      (i32.and (local.get $address) (i32.const 7)) ;; Bits 0, 1 and 2; simply performing bit-wise AND will result in rm's value.
     )
     (global.set $reg 
-      (i32.and
-        (i32.shr_u (global.get $address) (i32.const 3))
+      (i32.and ;; Performing AND after masking will provide us with reg's value.
+        (i32.shr_u (local.get $address) (i32.const 3)) ;; Bits 3 to 5; This line will mask out the lower bits.
         (i32.const 7)
       )
     )
-    (global.set $rm
-      (i32.shr_u (global.get $address) (i32.const 7))
+    (global.set $mod
+      (i32.shr_u (local.get $address) (i32.const 6)) ;; Most significant bits; only requires masking the lower bits, without any AND's.
     )
-
-    (block (block (block (block (global.get $mod)
-          (br_table
-              0 ;; mod == {0} --> (br 0)
-              1 ;; mod == {1} --> (br 1)
-              2 ;; mod == {2} --> (br 2)
-              3 ;; 0 > bit OR result >= 3 --> (br 3 (Default))
-            ))
-          ;; Target for (br 0)
-          (if (i32.eq (global.get $rm) (i32.const 6))
-            (global.set $disp
-              (call $ram.get16 (call $register.segment.get (global.get $CS)) (global.get $IP))
-            )
-            (call $step_ip (i32.const 2))
-          ) 
-          (else (if (i32.xor (i32.eq (global.get $rm) (i32.const 2)) (i32.eq (global.get $rm) (i32.const 3)))
-
-          ))
-          )
-        ;; Target for (br 1)
-        (return (i32.const 1)))
-      ;; Target for (br 2)
-      (return (i32.const 3)))
-    ;; (Default) Target for (br 3)
-    (return (i32.const 3))
+ (call $register.general.set16 (global.get $BX) (local.get $address))
+    call $get_ea
   )
 
 
@@ -661,11 +977,18 @@
 
   (; OpCodes ;)
   (func $0x00 (; ADD Eb, Gb ;)
-    (call $register.general.set8
-      (global.get $AL)
-      (call $ADD (i32.const 0) (i32.const 0) (i32.const 0) (i32.const 50) (i32.const 250))
+    call $modregrm
+
+    (call $logical_write8
+      (global.get $reg)
+      (call $ADD 
+        (i32.const 0) ;; 8-Bit
+        (i32.const 0) ;; Add
+        (i32.const 0) ;; No Carry
+        (call $register.general.get8 (global.get $reg))
+        (call $logical_read8 (global.get $rm))
+      )
     )
-    
   )
   (func $0x01 (; ADD Ev, Gv ;) (;
     i32.const 0
@@ -739,7 +1062,7 @@
 
 
   (; Undocumented or duplicate OpCodes ;)
-  ;; Most illegal OpCodes would just map to other documented instructions (e.g. 0x60 - 0x6f ==> 0x70 – 0x7f);
+  ;; Most illegal OpCodes would just map to other documented instructions (e.g., 0x60 - 0x6f ==> 0x70 – 0x7f);
   ;; while a few others such as 'SALC' actually did something useful.
   ;;
   ;; However, a real 8086 (or anything earlier than 80186) would do nothing when encountering a truly invalid OpCode (hence the nop).
