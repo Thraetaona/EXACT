@@ -5,7 +5,7 @@
   <img src="" alt="Logo">
 
   <p>
-    <strong>Graphical Intel iAPX 86/10 Emulator Written In Pure WebAssembly.</strong>
+    <strong><b>E</b>mulating <b>X</b>86 i<b>A</b>PX <b>C</b>PU on Ne<b>T</b></strong>
   </p>
 
   <p>
@@ -15,9 +15,7 @@
   <h3>
     <a href="https://VioletVillain.github.io/EXACT/">Website</a>
     <span> | </span>
-    <a href="https://github.com/VioletVillain/EXACT/wiki">Wiki</a>
-    <span> | </span>
-    <a href="https://github.com/VioletVillain/EXACT/issues">Forums</a>
+    <a href="https://github.com/VioletVillain/EXACT/issues">Issue Tracker</a>
     <span> | </span>
     <a href="https://github.com/VioletVillain/EXACT/actions">CI</a>
     <span> | </span>
@@ -31,4 +29,22 @@
 ***
 
 ## Introduction
-EXACT: **E**mulating **X**86 i**A**PX **C**PU on Ne**T**.
+EXACT is an acronym for '**E**mulating **X**86 i**A**PX **C**PU on Ne**T**'.
+
+This project was primarily done for two reasons:
+* *In favor of [RASM](https://github.com/VioletVillain/RASM)*, which is basically a work-in-progress Game Engine written in Rust.  Getting fluent in WebAssembly meant writing efficient code and eased its debugging.
+* *Experience*.  an in-depth study of processor's and hardware's behaviour will surely assist in writing optimized code; considering how it still has alot in common with x86_64, even though the 8086 lacked any concepts of caches (as an example).
+
+***
+
+## Features
+
+
+| Emulation Capability | Current Status |
+| :--- | ---: |
+| Instructions | All (Including illegal OpCodes) except for interrupts |
+| Registers | Both User-accessible registers and Reserved Flags are available|
+| RAM | Supports up to 2^20 unique addresses with 16/8 Bit interfaces for interacting |
+| Multimedia (GPU, sound, etc) | - |
+
+##### emulating external hardware, a graphical display or interrupts should be easy considering that the basis required for them is already finished.
