@@ -28,12 +28,15 @@
 
 ***
 
-## Introduction
+## Abstract
 EXACT is an acronym for '**E**mulating **X**86 i**A**PX **C**PU on Ne**T**'.
 
 This project was primarily done for two reasons:
 * *In favor of [RASM](https://github.com/VioletVillain/RASM)*, which is basically a work-in-progress Game Engine written in Rust.  Getting fluent in WebAssembly meant writing efficient code and eased its debugging.
-* *Experience*.  an in-depth study of processor's and hardware's behaviour will surely assist in writing optimized code; considering how it still has alot in common with x86_64, even though the 8086 lacked any concepts of caches (as an example).
+* *Experience*.  an in-depth study of processor that still has alot in common with x86_64 will surely assist in writing optimized code; even though the 8086 lacked any concepts of caches (as an example).
+
+The emulator has been thoroughly documented, except in places where doing so would have been considered extremely verbose or obivous. \
+
 
 ***
 
@@ -43,8 +46,8 @@ This project was primarily done for two reasons:
 | Emulation Capability | Current Status |
 | :--- | ---: |
 | Instructions | All (Including illegal OpCodes) except for interrupts |
-| Registers | Both User-accessible registers and Reserved Flags are available|
-| RAM | Supports up to 2^20 unique addresses with 16/8 Bit interfaces for interacting |
+| Registers | Both User-accessible registers and Reserved Flags are available |
+| RAM | Supports up to 2^20 unique segmentated addresses with 16/8 Bit interfaces for interactions |
 | Multimedia (GPU, sound, etc) | - |
 
-##### emulating external hardware, a graphical display or interrupts should be easy considering that the basis required for them is already finished.
+##### emulating external hardware, a graphical display or interrupts should be easy given that the basis required for them is already finished.
