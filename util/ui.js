@@ -5,17 +5,18 @@ export default updateUI;
 
 
 
-export async function updateUI(instance) {
-    await updateRegisters(instance);
+// byte and word buffers only exist as separate parameters because
+// calculating them based on the instance each time updateUI is run
+// is going to be resource-intensive, so we only allocate them once
+// inside our script tag.
+export async function updateUI(instance, byteBuffer, wordBuffer) {
+    await updateRegisters(instance, byteBuffer, wordBuffer);
 }
 
-async function updateRegisters(instance) {
+async function updateRegisters(instance, byteBuffer, wordBuffer) {
     const registers = document.getElementsByClassName("register");
 
-    const byteBuffer = new Uint8Array(instance.exports.memory.buffer);
-    const wordBuffer = new Uint16Array(instance.exports.memory.buffer);
-
-
+    
     for (let offset = 0; offset < 8; offset++) {
         // 16-Bit General-purpose and Index registers
         registers[offset].innerHTML = wordBuffer[offset];
