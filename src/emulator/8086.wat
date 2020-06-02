@@ -103,7 +103,7 @@
   ;;
   ;; This entire module on it's own should only be using less than 40 bytes of linear memory which is only a fraction
   ;; of what's specified above (17 pages), the majority of it is dedicated to the 1MiB of RAM for emulating User programs.
-  ;; Be aware that even a few _Bytes_ could be saved by using a segmented module along with offsets or branching;
+  ;; Be aware that even a few extra _Bytes_ could be saved by using a segmented module along with offsets or branching;
   ;; However, that would significantly lower performance and complicate the codebase with no Reasonable gains.
   ;; Linear memory layout:
   ;; (numbers represents bytes and each WASM memory page equqls 64KiB.)
@@ -181,13 +181,19 @@
   ;; Program counter
   (global $IP (mut i32) (i32.const 0)) ;; 0; Instruction pointer
 
-  ;; Mod|Reg|R/M that is extracted from the byte following an OpCode with a length higher than 1 (Refer to $parse_address for further information)
+  ;; Mod|Reg|R/M field that is extracted from the byte following most OpCodes with a length higher than 1 (Refer to $parse_address for further information)
   (global $mod (mut i32) (i32.const 0)) ;; mode, varies from 00b to 11b
   (global $reg (mut i32) (i32.const 0)) ;; reg, Should range from 000b to 111b
   (global $rm (mut i32) (i32.const 0)) ;; r/m, Like above, a value that is 000b to 111b
 
   ;; segment's other than the default $CS can be used for a particular code, $seg_override is set by prefix OpCodes.
   ;; https://en.wikipedia.org/wiki/X86_memory_segmentation#Practices
+  ;;
+  ;; seg_override is required because it's possible to select $CS as an override, which means that there won't be any other (clean) way
+  ;; other than using a separate variable to check for overrides.
+  ;; https://www.ngemu.com/threads/emu-decoding-8086-x86-opcodes.155663/post-2094016
+  ;;
+  ;; However, in case of our emulator, OpCode prefixes are handled no differently from the normal ones.
   (global $seg (mut i32) (i32.const 3)) ;; Current segment override (Only if seg_override is set)
   (global $seg_override (mut i32) (i32.const 0)) ;; Indicates whether $seg's value should be used instead of the default Data Segment
 
@@ -225,7 +231,7 @@
   (; 
    ; Table & Element Section
    ;)
-  ;; lookup table for dynamic dispatch of opcodes readen from hex code.
+  ;; lookup table for dynamic dispatch of OpCodes readen from hex code.
   (table $opcodes 256 256 funcref) (elem (i32.const 0)
     (;  0     1     2     3     4     5     6     7     8     9     A     B     C     D     E     F    / ;)
     $0x00 $0x01 $0x02 $0x03 $0x04 $0x05 $0x06 $0x07 $0x08 $0x09 $0x0a $0x0b $0x0c $0x0d $0x0e $0x0f (; 0 ;)
@@ -238,11 +244,11 @@
     $0x70 $0x71 $0x72 $0x73 $0x74 $0x75 $0x76 $0x77 $0x78 $0x79 $0x7a $0x7b $0x7c $0x7d $0x7e $0x7f (; 7 ;)
     $0x80 $0x81 $0x82 $0x83 $0x84 $0x85 $0x86 $0x87 $0x88 $0x89 $0x8a $0x8b $0x8c $0x8d $0x8e $0x8f (; 8 ;)
     $0x90 $0x91 $0x92 $0x93 $0x94 $0x95 $0x96 $0x97 $0x98 $0x99 $0x9a $0x9b $0x9c $0x9d $0x9e $0x9f (; 9 ;)
-(;    $0xa0 $0xa1 $0xa2 $0xa3 $0xa4 $0xa5 $0xa6 $0xa7 $0xa8 $0xa9 $0xaa $0xab $0xac $0xad $0xae $0xaf (; A ;)
+    $0xa0 $0xa1 $0xa2 $0xa3 $0xa4 $0xa5 $0xa6 $0xa7 $0xa8 $0xa9 $0xaa $0xab $0xac $0xad $0xae $0xaf (; A ;)
     $0xb0 $0xb1 $0xb2 $0xb3 $0xb4 $0xb5 $0xb6 $0xb7 $0xb8 $0xb9 $0xba $0xbb $0xbc $0xbd $0xbe $0xbf (; B ;)
     $0xc0 $0xc1 $0xc2 $0xc3 $0xc4 $0xc5 $0xc6 $0xc7 $0xc8 $0xc9 $0xca $0xcb $0xcc $0xcd $0xce $0xcf (; C ;)
-    $UNDF $UNDF $UNDF $UNDF $0xd4 $0xd5 $0xd6 $0xd7 $UNDF $UNDF $UNDF $UNDF $UNDF $UNDF $UNDF $UNDF (; D ;)
-    $0xe0 $0xe1 $0xe2 $0xe3 $0xe4 $0xe5 $0xe6 $0xe7 $0xe8 $0xe9 $0xea $0xeb $0xec $0xed $0xee $0xef (; E ;)
+    $0xd0 $0xd1 $0xd2 $0xd3 $0xd4 $0xd5 $0xd6 $0xd7 $UNDF $UNDF $UNDF $UNDF $UNDF $UNDF $UNDF $UNDF (; D ;)
+(;    $0xe0 $0xe1 $0xe2 $0xe3 $0xe4 $0xe5 $0xe6 $0xe7 $0xe8 $0xe9 $0xea $0xeb $0xec $0xed $0xee $0xef (; E ;)
     $0xf0 $0xf1 $0xf2 $0xf3 $0xf4 $0xf5 $UNDF $UNDF $0xf8 $0xf9 $0xfa $0xfb $0xfc $0xfd $UNDF $UNDF (; F ;) ;)
   )
 
@@ -590,7 +596,7 @@
           (global.get $IP)
           (local.get $value)
         )
-        (i32.const 65536)
+        (i32.const 65535)
       )
     )
   )
@@ -601,7 +607,7 @@
   ;; It uses multiple nested jump tables internally.  The logic should be quite straightforward after reading the below link.
   ;;
   ;; https://www.ic.unicamp.br/~celio/mc404s2-03/addr_modes/intel_addr.html#HEADING2-35
-  ;; In general, addressing modes involving $BP will use the Data Segment by default; Stack Segment otherwise.
+  ;; In general, addressing modes involving $BP will use the Stack Segment by default; Data Segment otherwise.
   ;; The above rule only applies when there are no segment overrides, however.
   ;;
   ;; It's worth mentioning that $compute_ea will only calculate a new address if $mod is less than 11b,
@@ -1022,7 +1028,7 @@
 
 
   ;; Sets Zero/Sign/Parity flags accordingly to the resulting value from math operations, does not 'Consume' the value.
-  (func $set_zsp (param $value i32) 
+  (func $set_zsp (param $value i32)
                  (result i32)
     ;; If the value equals 0 then ZF is set to 1; 0 otherwise.
     (call $register.flag.set
@@ -1034,7 +1040,7 @@
     (call $register.flag.set
       (global.get $SF)
       (i32.shr_u
-        (call $i16.extend8_s (local.get $value))
+        (local.get $value)
         (i32.const 15)
       )
     )
@@ -1117,7 +1123,7 @@
 
 
   (; OpCode backends (Commonly used assets across OpCodes) ;)
-  ;; a sign-agnostic Quinary operation that adds a value (plus an optional carry flag) to another.
+  ;; a sign-agnostic Binary operation with multiple conditions that adds a value (plus an optional carry flag) to another.
   ;; As for subtraction, Although it is a "real" instruction at the hardware level (i.e., SUB has it's own binary OpCode and the 
   ;; CPU itself will be aware that it should produce result of subtraction), we can reuse the existing $checked_add function;
   ;; since we are _emulating_ a 8086, we had to take a completely different approach if we were to _simulate_ that CPU.
@@ -1125,7 +1131,7 @@
   ;; $operation indicates whether the operation is a subtraction (1) or an addition (0).
   ;; $mode states a 16-Bit operation (1) or 8-Bit (0).
   (func $checked_add (param $mode i32) (param $operation i32) (param $carry i32) (param $destination i32) (param $source i32)
-             (result i32)
+                     (result i32)
     (i32.add
       (i32.add (local.get $destination) (select (call $i32.neg (local.get $source)) (local.get $source)
                                                 (local.get $operation)))
@@ -1133,7 +1139,8 @@
                       (local.get $operation)) (i32.const 0)
               (local.get $carry))
     )
-    call $set_zsp 
+    
+    call $set_zsp
     (call $set_aco (local.get $mode) (local.get $operation ) (local.get $destination) (local.get $source))
 
     return (; value that is left on the stack ;)
@@ -2677,7 +2684,7 @@
     
     (call $GRP1/16
       (call $logical_read16 (global.get $rm))
-      (call $i16.extend8_s ;; This opcode accepts both a byte AND a word as it's operands, so the byte might have to be sign-extended.
+      (call $i16.extend8_s ;; This opcode accepts both a byte AND a word as it's operands, so the byte has to be sign-extended.
         (block (result i32)
           (call $ram.get16 (call $register.segment.get (global.get $CS)) (global.get $IP))
           (call $step_ip (i32.const 2))
@@ -3063,6 +3070,608 @@
     (call $register.general.set8 (global.get $AH) (i32.and (call $u16.convert_flags) (i32.const 0xff)))
   )
 
+  (func $0xa0 (; MOV AL, Ob ;)
+    (call $register.general.set8
+      (global.get $AL)
+      (block (result i32)
+        (call $ram.get8 (call $register.segment.get (global.get $CS)) (global.get $IP))
+        (call $step_ip (i32.const 1))
+      )
+    )
+  )
+  (func $0xa1 (; MOV AX, Ov ;)
+    (call $register.general.set16
+      (global.get $AX)
+      (block (result i32)
+        (call $ram.get16 (call $register.segment.get (global.get $CS)) (global.get $IP))
+        (call $step_ip (i32.const 2))
+      )
+    )
+  )
+  (func $0xa2 (; MOV Ob, AL ;)
+    (call $ram.set8
+      (global.get $seg)
+      (block (result i32)
+        (call $ram.get8 (call $register.segment.get (global.get $CS)) (global.get $IP))
+        (call $step_ip (i32.const 1))
+      )
+      (call $register.general.get8 (global.get $AL))
+    )
+  )
+  (func $0xa3 (; MOV Ov, AX ;)
+    (call $ram.set16
+      (global.get $seg)
+      (block (result i32)
+        (call $ram.get16 (call $register.segment.get (global.get $CS)) (global.get $IP))
+        (call $step_ip (i32.const 2))
+      )
+      (call $register.general.get16 (global.get $AX))
+    )
+  )
+
+  (func $0xa4 (; MOVSB ;)
+    (call $ram.set8
+      (call $register.segment.get (global.get $ES))
+      (call $register.general.get16 (global.get $DI))
+      (call $ram.get8 (call $register.segment.get (global.get $seg) (call $register.general.get16 (global.get $SI))))
+    )
+
+    (call $register.general.set16
+      (global.get $SI)
+      (i32.add
+        (call $register.general.get16 (global.get $SI))
+        (select (i32.const -1) (i32.const 1)
+                (call $register.flag.get (global.get $DF)))
+      )
+    )
+    (call $register.general.set16
+      (global.get $DI)
+      (i32.add
+        (call $register.general.get16 (global.get $DI))
+        (select (i32.const -1) (i32.const 1)
+                (call $register.flag.get (global.get $DF)))
+      )
+    )
+  )
+  (func $0xa5 (; MOVSW ;)
+    (call $ram.set16 
+      (call $register.segment.get (global.get $ES))
+      (call $register.general.get16 (global.get $DI))
+      (call $ram.get16 (call $register.segment.get (global.get $seg)) (call $register.general.get16 (global.get $SI)))
+    )
+
+    (call $register.general.set16
+      (global.get $SI)
+      (i32.add
+        (call $register.general.get16 (global.get $SI))
+        (select (i32.const -2) (i32.const 2)
+                (call $register.flag.get (global.get $DF)))
+      )
+    )
+    (call $register.general.set16
+      (global.get $DI)
+      (i32.add
+        (call $register.general.get16 (global.get $DI))
+        (select (i32.const -2) (i32.const 2)
+                (call $register.flag.get (global.get $DF)))
+      )
+    )
+  )
+
+  (func $0xa6 (; CMPSB ;)
+    (drop
+      (call $checked_add 
+        (i32.const 0) ;; 8-Bit
+        (i32.const 1) ;; Subtraction
+        (i32.const 0) ;; Carry
+        (call $ram.get8 (call $register.segment.get (global.get $ES) (call $register.general.get16 (global.get $DI))))
+        (call $ram.get8 (call $register.segment.get (global.get $seg) (call $register.general.get16 (global.get $SI))))
+      )
+    )
+
+    (call $register.general.set16
+      (global.get $SI)
+      (i32.add
+        (call $register.general.get16 (global.get $SI))
+        (select (i32.const -1) (i32.const 1)
+                (call $register.flag.get (global.get $DF)))
+      )
+    )
+    (call $register.general.set16
+      (global.get $DI)
+      (i32.add
+        (call $register.general.get16 (global.get $DI))
+        (select (i32.const -1) (i32.const 1)
+                (call $register.flag.get (global.get $DF)))
+      )
+    )
+  )
+  (func $0xa7 (; CMPSW ;)
+    (drop
+      (call $checked_add 
+        (i32.const 1) ;; 16-Bit
+        (i32.const 1) ;; Subtraction
+        (i32.const 0) ;; Carry
+        (call $ram.get16 (call $register.segment.get (global.get $ES) (call $register.general.get16 (global.get $DI))))
+        (call $ram.get16 (call $register.segment.get (global.get $seg) (call $register.general.get16 (global.get $SI))))
+      )
+    )
+
+    (call $register.general.set16
+      (global.get $SI)
+      (i32.add
+        (call $register.general.get16 (global.get $SI))
+        (select (i32.const -2) (i32.const 2)
+                (call $register.flag.get (global.get $DF)))
+      )
+    )
+    (call $register.general.set16
+      (global.get $DI)
+      (i32.add
+        (call $register.general.get16 (global.get $DI))
+        (select (i32.const -2) (i32.const 2)
+                (call $register.flag.get (global.get $DF)))
+      )
+    )
+  )
+
+  (func $0xa8 (; TEST AL, Ib ;)
+    (drop
+      (call $set_zsp
+        (i32.and
+          (call $register.general.get8 (global.get $AL))
+          (block (result i32)
+            (call $ram.get8 (call $register.segment.get (global.get $CS)) (global.get $IP))
+            (call $step_ip (i32.const 1))
+          )
+        )
+      )
+    )
+  )
+  (func $0xa9 (; TEST AX, Iv ;)
+    (drop
+      (call $set_zsp
+        (i32.and
+          (call $register.general.get16 (global.get $AX))
+          (block (result i32)
+            (call $ram.get16 (call $register.segment.get (global.get $CS)) (global.get $IP))
+            (call $step_ip (i32.const 2))
+          )
+        )
+      )
+    )
+  )
+
+  (func $0xaa (; STOSB ;)
+    (call $ram.set8
+      (call $register.segment.get (global.get $ES))
+      (call $register.general.get16 (global.get $DI))
+      (call $register.general.get8 (global.get $AL))
+    )
+
+    (call $register.general.set16
+      (global.get $DI)
+      (i32.add
+        (call $register.general.get16 (global.get $DI))
+        (select (i32.const -1) (i32.const 1)
+                (call $register.flag.get (global.get $DF)))
+      )
+    )
+  )
+  (func $0xab (; STOSW ;)
+    (call $ram.set16
+      (call $register.segment.get (global.get $ES))
+      (call $register.general.get16 (global.get $DI))
+      (call $register.general.get16 (global.get $AX))
+    )
+
+    (call $register.general.set16
+      (global.get $DI)
+      (i32.add
+        (call $register.general.get16 (global.get $DI))
+        (select (i32.const -2) (i32.const 2)
+                (call $register.flag.get (global.get $DF)))
+      )
+    )
+  )
+
+  (func $0xac (; LODSB ;)
+    (call $register.general.set8
+      (global.get $AL)
+      (call $ram.get8 (call $register.segment.get (global.get $seg)) (call $register.general.get16 (global.get $SI)))
+    )
+
+    (call $register.general.set16
+      (global.get $SI)
+      (i32.add
+        (call $register.general.get16 (global.get $SI))
+        (select (i32.const -1) (i32.const 1)
+                (call $register.flag.get (global.get $DF)))
+      )
+    )
+  )
+  (func $0xad (; LODSW ;)
+    (call $register.general.set16
+      (global.get $AX)
+      (call $ram.get16 (call $register.segment.get (global.get $seg)) (call $register.general.get16 (global.get $SI)))
+    )
+
+    (call $register.general.set16
+      (global.get $SI)
+      (i32.add
+        (call $register.general.get16 (global.get $SI))
+        (select (i32.const -2) (i32.const 2)
+                (call $register.flag.get (global.get $DF)))
+      )
+    )
+  )
+
+  (func $0xae (; SCASB ;)
+    (drop
+      (call $checked_add 
+        (i32.const 0) ;; 8-Bit
+        (i32.const 1) ;; Subtraction
+        (i32.const 0) ;; Carry
+        (call $register.general.get8 (global.get $AL))
+        (call $ram.get8 (call $register.segment.get (global.get $ES) (call $register.general.get16 (global.get $DI))))
+      )
+    )
+
+    (call $register.general.set16
+      (global.get $SI)
+      (i32.add
+        (call $register.general.get16 (global.get $SI))
+        (select (i32.const -1) (i32.const 1)
+                (call $register.flag.get (global.get $DF)))
+      )
+    )
+  )
+  (func $0xaf (; SCASW ;)
+    (drop
+      (call $checked_add 
+        (i32.const 1) ;; 16-Bit
+        (i32.const 1) ;; Subtraction
+        (i32.const 0) ;; Carry
+        (call $register.general.get16 (global.get $AX))
+        (call $ram.get16 (call $register.segment.get (global.get $ES) (call $register.general.get16 (global.get $DI))))
+      )
+    )
+
+    (call $register.general.set16
+      (global.get $SI)
+      (i32.add
+        (call $register.general.get16 (global.get $SI))
+        (select (i32.const -2) (i32.const 2)
+                (call $register.flag.get (global.get $DF)))
+      )
+    )
+  )
+
+  (func $0xb0 (; MOV AL, Ib ;)
+    (call $register.general.set8
+      (global.get $AL)
+      (block (result i32)
+        (call $ram.get8 (call $register.segment.get (global.get $CS)) (global.get $IP))
+        (call $step_ip (i32.const 1))
+      )
+    )
+  )
+  (func $0xb1 (; MOV CL, Ib ;)
+    (call $register.general.set8
+      (global.get $CL)
+      (block (result i32)
+        (call $ram.get8 (call $register.segment.get (global.get $CS)) (global.get $IP))
+        (call $step_ip (i32.const 1))
+      )
+    )
+  )
+  (func $0xb2 (; MOV DL, Ib ;)
+    (call $register.general.set8
+      (global.get $DL)
+      (block (result i32)
+        (call $ram.get8 (call $register.segment.get (global.get $CS)) (global.get $IP))
+        (call $step_ip (i32.const 1))
+      )
+    )
+  )
+  (func $0xb3 (; MOV BL, Ib ;)
+    (call $register.general.set8
+      (global.get $BL)
+      (block (result i32)
+        (call $ram.get8 (call $register.segment.get (global.get $CS)) (global.get $IP))
+        (call $step_ip (i32.const 1))
+      )
+    )
+  )
+  (func $0xb4 (; MOV AH, Ib ;)
+    (call $register.general.set8
+      (global.get $AH)
+      (block (result i32)
+        (call $ram.get8 (call $register.segment.get (global.get $CS)) (global.get $IP))
+        (call $step_ip (i32.const 1))
+      )
+    )
+  )
+  (func $0xb5 (; MOV CH, Ib ;)
+    (call $register.general.set8
+      (global.get $CH)
+      (block (result i32)
+        (call $ram.get8 (call $register.segment.get (global.get $CS)) (global.get $IP))
+        (call $step_ip (i32.const 1))
+      )
+    )
+  )
+  (func $0xb6 (; MOV DH, Ib ;)
+    (call $register.general.set8
+      (global.get $DH)
+      (block (result i32)
+        (call $ram.get8 (call $register.segment.get (global.get $CS)) (global.get $IP))
+        (call $step_ip (i32.const 1))
+      )
+    )
+  )
+  (func $0xb7 (; MOV BH, Ib ;)
+    (call $register.general.set8
+      (global.get $BH)
+      (block (result i32)
+        (call $ram.get8 (call $register.segment.get (global.get $CS)) (global.get $IP))
+        (call $step_ip (i32.const 1))
+      )
+    )
+  )
+
+  (func $0xb8 (; MOV AX, Iv ;)
+    (call $register.general.set16
+      (global.get $AX)
+      (block (result i32)
+        (call $ram.get16 (call $register.segment.get (global.get $CS)) (global.get $IP))
+        (call $step_ip (i32.const 2))
+      )
+    )
+  )
+  (func $0xb9 (; MOV CX, Iv ;)
+    (call $register.general.set16
+      (global.get $CX)
+      (block (result i32)
+        (call $ram.get16 (call $register.segment.get (global.get $CS)) (global.get $IP))
+        (call $step_ip (i32.const 2))
+      )
+    )
+  )
+  (func $0xba (; MOV DX, Iv ;)
+    (call $register.general.set16
+      (global.get $DX)
+      (block (result i32)
+        (call $ram.get16 (call $register.segment.get (global.get $CS)) (global.get $IP))
+        (call $step_ip (i32.const 2))
+      )
+    )
+  )
+  (func $0xbb (; MOV BX, Iv ;)
+    (call $register.general.set16
+      (global.get $BX)
+      (block (result i32)
+        (call $ram.get16 (call $register.segment.get (global.get $CS)) (global.get $IP))
+        (call $step_ip (i32.const 2))
+      )
+    )
+  )
+  (func $0xbc (; MOV SP, Iv ;)
+    (call $register.general.set16
+      (global.get $SP)
+      (block (result i32)
+        (call $ram.get16 (call $register.segment.get (global.get $CS)) (global.get $IP))
+        (call $step_ip (i32.const 2))
+      )
+    )
+  )
+  (func $0xbd (; MOV BP, Iv ;)
+    (call $register.general.set16
+      (global.get $BP)
+      (block (result i32)
+        (call $ram.get16 (call $register.segment.get (global.get $CS)) (global.get $IP))
+        (call $step_ip (i32.const 2))
+      )
+    )
+  )
+  (func $0xbe (; MOV SI, Iv ;)
+    (call $register.general.set16
+      (global.get $SI)
+      (block (result i32)
+        (call $ram.get16 (call $register.segment.get (global.get $CS)) (global.get $IP))
+        (call $step_ip (i32.const 2))
+      )
+    )
+  )
+  (func $0xbf (; MOV DI, Iv ;)
+    (call $register.general.set16
+      (global.get $DI)
+      (block (result i32)
+        (call $ram.get16 (call $register.segment.get (global.get $CS)) (global.get $IP))
+        (call $step_ip (i32.const 2))
+      )
+    )
+  )
+
+  (func $0xc2 (; RET Iw ;)
+    (call $register.general.set16 
+      (global.get $SP)
+      (i32.add
+        (call $register.general.get16 (global.get $SP))
+        (call $ram.get16 (call $register.segment.get (global.get $CS)) (global.get $IP))
+      )
+    )
+
+    (global.set $IP (call $pop))
+  )
+  (func $0xc3 (; RET ;)
+    (global.set $IP (call $pop))
+  )
+
+  (func $0xc4 (; LES Gv, Mp ;)
+    call $parse_address
+    
+    (call $register.general.set16
+      (global.get $reg)
+      (call $logical_read16 (global.get $ea))
+    )
+
+    (call $register.general.set16
+      (global.get $ES)
+      (call $logical_read16 (i32.add (global.get $ea) (i32.const 2)))
+    )
+  )
+  (func $0xc5 (; LDS Gv, Mp ;)
+    call $parse_address
+    
+    (call $register.general.set16
+      (global.get $reg)
+      (call $logical_read16 (global.get $ea))
+    )
+
+    (call $register.general.set16
+      (global.get $DS)
+      (call $logical_read16 (i32.add (global.get $ea) (i32.const 2)))
+    )
+  )
+  (func $0xc6 (; MOV Eb, Ib ;)
+    call $parse_address
+
+    (call $logical_write8
+      (global.get $rm)
+      (block (result i32)
+        (call $ram.get8 (call $register.segment.get (global.get $CS)) (global.get $IP))
+        (call $step_ip (i32.const 1))
+      )
+    )
+  )
+  (func $0xc7 (; MOV Ev, Iv ;) 
+    call $parse_address
+
+    (call $logical_write16
+      (global.get $rm)
+      (block (result i32)
+        (call $ram.get16 (call $register.segment.get (global.get $CS)) (global.get $IP))
+        (call $step_ip (i32.const 2))
+      )
+    )
+  )
+
+  (func $0xca (; RETF Iw ;)
+    (call $register.general.set16 
+      (global.get $SP)
+      (i32.add
+        (call $register.general.get16 (global.get $SP))
+        (call $ram.get16 (call $register.segment.get (global.get $CS)) (global.get $IP))
+      )
+    )
+
+    (global.set $IP (call $pop))
+
+    (call $register.segment.set 
+      (global.get $CS)
+      (call $pop)
+    )
+  )
+  (func $0xcb (; RETF ;)
+    (global.set $IP (call $pop))
+
+    (call $register.segment.set 
+      (global.get $CS)
+      (call $pop)
+    )
+  )
+
+  ;; Interrupts have not been implemented, yet.
+  (func $0xcc (; INT 3 ;)
+    unreachable
+  )
+  (func $0xcd (; INT Ib ;)
+    (block (result i32)
+        (call $ram.get8 (call $register.segment.get (global.get $CS)) (global.get $IP))
+        (call $step_ip (i32.const 1))
+    )
+    unreachable
+  )
+  (func $0xce (; INTO ;)
+    (if 
+      (call $register.flag.get (global.get $OF))
+      (then
+        unreachable
+      )
+    )
+  )
+  
+  (func $0xcf (; IRET ;)
+    (global.set $IP (call $pop))
+
+    (call $register.segment.set 
+      (global.get $CS)
+      (call $pop)
+    )
+
+    (call $flag.convert_u16 (call $pop))
+  )
+
+  (func $0xd0 (; GRP2 Eb, 1 ;)
+    call $parse_address
+    
+    (call $GRP1/8
+      (call $logical_read8 (global.get $rm))
+      (block (result i32)
+        (call $ram.get8 (call $register.segment.get (global.get $CS)) (global.get $IP))
+        (call $step_ip (i32.const 1))
+      )
+    )
+  )
+  (func $0xd1 (; GRP2 Ev, 1 ;)
+    call $parse_address
+    
+    (call $GRP1/16
+      (call $logical_read16 (global.get $rm))
+      (block (result i32)
+        (call $ram.get16 (call $register.segment.get (global.get $CS)) (global.get $IP))
+        (call $step_ip (i32.const 2))
+      )
+    )
+  )
+  (func $0xd2 (; GRP2 Eb, CL ;)
+    call $parse_address
+    
+    (call $GRP1/8
+      (call $logical_read8 (global.get $rm))
+      (block (result i32)
+        (call $ram.get8 (call $register.segment.get (global.get $CS)) (global.get $IP))
+        (call $step_ip (i32.const 1))
+      )
+    )
+  )
+  (func $0xd3 (; GRP2 Ev, CL ;)
+    call $parse_address
+    
+    (call $GRP1/16
+      (call $logical_read16 (global.get $rm))
+      (call $i16.extend8_s ;; This opcode accepts both a byte AND a word as it's operands, so the byte might have to be sign-extended.
+        (block (result i32)
+          (call $ram.get16 (call $register.segment.get (global.get $CS)) (global.get $IP))
+          (call $step_ip (i32.const 2))
+        )
+      )
+    )
+  )
+  (func $0xd4 (; AAM ;)
+    nop
+  )
+  (func $0xd5 (; AAD ;)
+    nop
+  )
+
+  (func $0xd7 (; XLAT ;)
+    (;call $register.general.set8 
+      (global.get $AL)
+      
+    ;)
+  )
 
   (; OpCode Extensions (http://www.mlsite.net/8086/#tbl_ext) ;)
   (func $GRP1/8 (param $destination i32) (param $source i32)
@@ -3079,7 +3688,7 @@
   )
   (func $GRP1 (param $mode i32) (param $destination i32) (param $source i32)
               (result i32)
-    (block (block (block (block (block (block (block (block (local.get $destination)
+    (block (block (block (block (block (block (block (block (global.get $reg)
                   (br_table
                     0         ;; reg == {0} --> (br 0)[ADD]
                     1         ;; reg == {1} --> (br 1)[OR]
@@ -3162,9 +3771,99 @@
       )
     )
   )
-  
-  
 
+  (func $GRP2/8 (param $destination i32) (param $source i32)
+    (call $register.general.set8
+      (global.get $rm)
+      (call $GRP2 (i32.const 0) (local.get $destination) (local.get $source))
+    )
+  )
+  (func $GRP2/16 (param $destination i32) (param $source i32)
+    (call $register.general.set16
+      (global.get $rm)
+      (call $GRP2 (i32.const 1) (local.get $destination) (local.get $source))
+    )
+  )
+  (func $GRP2 (param $mode i32) (param $destination i32) (param $source i32)
+              (result i32) 
+              (local $temp i32)
+    (block (block (block (block (block (block (block (block (global.get $reg)
+                  (br_table
+                    0         ;; reg == {0} --> (br 0)[ROL]
+                    1         ;; reg == {1} --> (br 1)[ROR]
+                    2         ;; reg == {2} --> (br 2)[RCL]
+                    3         ;; reg == {3} --> (br 3)[RCR]
+                    4         ;; reg == {4} --> (br 4)[SHL]
+                    5         ;; reg == {5} --> (br 5)[SHR]
+                    6         ;; reg == {6} --> (br 6)[UNDF]
+                    7         ;; 0 > reg OR reg >= 7 --> (br 7 (Default))[SAR]
+                  ))
+                  ;; Target for (br 0)
+                  (block
+                    (i32.rotr (local.get $destination) (local.get $source))
+                    local.tee $temp
+                    return
+                  ))
+                ;; Target for (br 1)
+                (return
+                  (i32.rotl (local.get $destination) (local.get $source))
+                ))
+              ;; Target for (br 2)
+              (return
+                (call $checked_add 
+                  (local.get $mode)
+                  (i32.const 0) ;; Addition
+                  (i32.const 1) ;; Carry
+                  (local.get $destination)
+                  (local.get $source)
+                )
+              ))
+            ;; Target for (br 3)
+            (return
+              (call $checked_add 
+                (local.get $mode)
+                (i32.const 1) ;; Subtraction
+                (i32.const 1) ;; Carry
+                (local.get $destination)
+                (local.get $source)
+              )
+            ))
+          ;; Target for (br 4)
+          (return
+            (i32.and
+              (local.get $destination)
+              (local.get $source)
+            )
+          ))
+        ;; Target for (br 5)
+        (return
+          (call $checked_add 
+            (local.get $mode)
+            (i32.const 1) ;; Subtraction
+            (i32.const 0) ;; Carry
+            (local.get $destination)
+            (local.get $source)
+          )
+        ))
+      ;; Target for (br 6)
+      (return
+        (i32.xor
+          (local.get $destination)
+          (local.get $source)
+        )
+      ))
+    ;; (Default) Target for (br 7)
+    (return
+      (call $checked_add 
+        (local.get $mode)
+        (i32.const 1) ;; Subtraction
+        (i32.const 0) ;; Carry
+        (local.get $destination)
+        (local.get $source)
+      )
+    )
+  )
+  
 
   (; Undocumented or duplicate OpCodes ;)
   ;; Most illegal OpCodes would just map to other documented instructions (e.g., 0x60 - 0x6f --> 0x70 – 0x7f);
@@ -3233,6 +3932,19 @@
   )
   (func $0x6f (; equivalent: 7fh ;)
     (call $0x7f)
+  )
+
+  (func $0xc0 (; equivalent: c2h ;)
+    (call $0xc2)
+  )
+  (func $0xc1 (; equivalent: c3h ;)
+    (call $0xc3)
+  )
+  (func $0xc8 (; equivalent: cah ;)
+    (call $0xca)
+  )
+  (func $0xc9 (; equivalent: cbh ;)
+    (call $0xcb)
   )
 
   ;; this OpCode sets AL to 256 if the carry flag is set; 0 otherwise.
