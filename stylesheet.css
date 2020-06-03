@@ -25,7 +25,7 @@ body {
  * Custom styles for elements 
  */
 h1 {
-  font-size: 4em;
+  font-size: 5em;
   color: var(--text-color);
   text-align: center;
   animation: glow 1s ease-in-out infinite alternate;
