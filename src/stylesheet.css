@@ -31,6 +31,10 @@ h1 {
   animation: glow 1s ease-in-out infinite alternate;
 }
 
+code {
+  font-family: lucida console !important; /* First impression is important, some browsers try to override the default font for <code> tags */
+}
+
 p {
   font-size: 1.25em;
 }
@@ -70,11 +74,6 @@ hr {
   column-gap: 6em;
   column-rule: 1px solid var(--accent-color);
   font-size: 0.95em;
-}
-legend {
-  font-family: Georgia;
-  font-weight: bold;
-  text-align: center;
 }
 
 

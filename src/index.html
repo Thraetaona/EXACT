@@ -32,8 +32,8 @@
     <!-- Control buttons are disabled until something is available to run -->
     <section class="container" id="control">
       <button class="button" id='run' disabled>Execute</button>
-      <!--button class="button" id='step' disabled>Step</button-->
-      <!--button class="button" id='stop' disabled>Halt</button-->
+      <button class="button" id='step' disabled>Step</button>
+      <button class="button" id='stop' disabled>Halt</button>
     </section>
 
 
@@ -101,6 +101,7 @@
           const wordBuffer = new Uint16Array(emulator.instance.exports.memory.buffer);
 
           document.getElementById('upload').addEventListener('change', function(uploaded) {
+            emulator.instance.exports.cleanup();
             let file = uploaded.target.files[0];
             let reader = new FileReader();
 
@@ -113,13 +114,22 @@
               }
 
               if (programLength > 0) {
-                for (let offset = 0; offset < 1; offset++) {
+                for (let offset = 0; offset < 3; offset++) {
                   document.getElementById("control").children[offset].disabled = false;
                 }
               }
 
+              // This will only run correctly for once, as it cannot obtain the value of 'programLength'
+              // after being attached as an Event Listener.  Rather than relying on hacks this method should
+              // be replaced with having a separate emulator instance for emulating each program.
               document.getElementById('run').addEventListener('click', function() {
                 emulator.instance.exports.execute(programLength);
+              }, false);
+              document.getElementById('step').addEventListener('click', function() {
+                emulator.instance.exports.execute(emulator.instance.exports.IP.value + 1);
+              }, false);
+              document.getElementById('stop').addEventListener('click', function() {
+                emulator.instance.exports.execute(emulator.instance.exports.IP.value);
               }, false);
             }
             
