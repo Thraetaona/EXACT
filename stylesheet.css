@@ -25,14 +25,14 @@ body {
  * Custom styles for elements 
  */
 h1 {
-  font-size: 5em;
+  font-size: 4em;
   color: var(--text-color);
   text-align: center;
   animation: glow 1s ease-in-out infinite alternate;
 }
 
 code {
-  font-family: monospace !important; /* First impression is important, some browsers try to override the default font for <code> tags */
+  font-family: lucida console !important; /* First impression is important, some browsers try to override the default font for <code> tags */
 }
 
 p {
