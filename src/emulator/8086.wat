@@ -126,11 +126,10 @@
   (; 
    ; Export Section
    ;)
-  (export "execute" (func $execute))
-  (export "cleanup" (func $cleanup))
   (export "memory" (memory 0))
+  (export "execute" (func $execute))
   (export "IP" (global $IP))
-
+  (export "programLength" (global $program_length))
 
 
   (; 
@@ -181,8 +180,22 @@
   (; The followings are actual mutable global _variables_.  Unlike the above globals these are accessed directly. ;)
   ;; Program counter
   (global $IP (mut i32) (i32.const 0)) ;; 0; Instruction pointer
+  ;; Length of the current program (Number of bytes) that is loaded in memory.  We can not use any methods other than assigning a variable
+  ;; to program's length. As an example, if we were to use a 'Sentinent byte' (i.e., Pre-defining a value to represent 'Undefined' in JavaScript
+  ;; and then inserting it at the end of readen binaries (Since JavaScript's 'Undefined' is equal to 0 (i32 Zero) in WebAssembly)), then we could
+  ;; not guarantee the correct emulation of non-standard program; to further clarify, suppose we are choosing a Sentinent value (byte) that is not
+  ;; a legal and documented OpCode, that leaves us with 23[1] out of 256 (0xff) options, but the 8086 (And anything earlier than a 80186) do nothing upon
+  ;; encountering an illegal OpCode (Basically a no-op), now if the user or the assembler decides to put one of those illegal OpCodes in
+  ;; their binary file, our emulator would immediately terminate the program once it saw that Sentinent byte (False positive); while the expected
+  ;; behaviour was to ignore the said byte and continue execution.
+  ;;
+  ;; [1]: the number is actually 0.  considering that some illegal OpCodes such as 'SALC' actually did something useful, we emulate those, too.
+  ;; Other illegal OpCodes either mapped to another one (e.g., 0x60 - 0x6f --> 0x70 – 0x7f), or did not do anything _noticeable_ at all (Like writing
+  ;; a register to itself which is pointless); so in reality we could only choose from the ones that simply acted like an extra nop (no operation) and
+  ;; well, there aren't any 'Useless' OpCodes available for that purpose.
+  (global $program_length (mut i32) (i32.const 0)) ;; a variable representing the size of the current program.
 
-  ;; Mod|Reg|R/M field that is extracted from the byte following most OpCodes with a length higher than 1 (Refer to $parse_address for further information)
+  ;; Mod|Reg|R/M field that is extracted from the byte following most OpCodes with a length higher than 1 (Refer to $parse_address for more information)
   (global $mod (mut i32) (i32.const 0)) ;; mode, varies from 00b to 11b
   (global $reg (mut i32) (i32.const 0)) ;; reg, Should range from 000b to 111b
   (global $rm (mut i32) (i32.const 0)) ;; r/m, Like above, a value that is 000b to 111b
@@ -248,9 +261,9 @@
     $0xa0 $0xa1 $0xa2 $0xa3 $0xa4 $0xa5 $0xa6 $0xa7 $0xa8 $0xa9 $0xaa $0xab $0xac $0xad $0xae $0xaf (; A ;)
     $0xb0 $0xb1 $0xb2 $0xb3 $0xb4 $0xb5 $0xb6 $0xb7 $0xb8 $0xb9 $0xba $0xbb $0xbc $0xbd $0xbe $0xbf (; B ;)
     $0xc0 $0xc1 $0xc2 $0xc3 $0xc4 $0xc5 $0xc6 $0xc7 $0xc8 $0xc9 $0xca $0xcb $0xcc $0xcd $0xce $0xcf (; C ;)
-    $0xd0 $0xd1 $0xd2 $0xd3 $0xd4 $0xd5 $0xd6 $0xd7 $UNDF $UNDF $UNDF $UNDF $UNDF $UNDF $UNDF $UNDF (; D ;)
+    $0xd0 $0xd1 $0xd2 $0xd3 $0xd4 $0xd5 $0xd6 $0xd7 $0xd8 $0xd9 $0xda $0xdb $0xdc $0xdd $0xde $0xdf (; D ;)
 (;    $0xe0 $0xe1 $0xe2 $0xe3 $0xe4 $0xe5 $0xe6 $0xe7 $0xe8 $0xe9 $0xea $0xeb $0xec $0xed $0xee $0xef (; E ;)
-    $0xf0 $0xf1 $0xf2 $0xf3 $0xf4 $0xf5 $UNDF $UNDF $0xf8 $0xf9 $0xfa $0xfb $0xfc $0xfd $UNDF $UNDF (; F ;) ;)
+    $0xf0 $0xf1 $0xf2 $0xf3 $0xf4 $0xf5 $0xf6 $0xf7 $0xf8 $0xf9 $0xfa $0xfb $0xfc $0xfd $0xfe $0xff (; F ;) ;)
   )
 
 
@@ -265,11 +278,11 @@
   ;)
 
 
-  (func $execute (param $program_length i32)
+  (func $execute
     ;; Combination of a block alongside this loop will form a 'while' loop.
     (block (loop $eu ;; Execution Unit
       ;; Stops the execution (Jumps out) if the program has reached it's end.
-      (br_if 1 (i32.ge_u (global.get $IP) (local.get $program_length)))
+      (br_if 1 (i32.ge_u (global.get $IP) (global.get $program_length)))
 
 
       (call_indirect (block (result i32) ;; Bus Interface Unit          
@@ -281,21 +294,6 @@
 
       br 0 ;; This will return to the top of this loop.
     ))
-  )
-
-  ;; This will reset $IP, all the registers and also our RAM back to their original states.
-  ;; We could also use a separate instance for each emulated program; this is a more ideal solution,
-  ;; but for now simply calling a $cleanup function and re-using the existing instanace is sufficient.
-  (func $cleanup
-    (global.set $IP (i32.const 0))
-    (global.set $mod (i32.const 0))
-    (global.set $reg (i32.const 0))
-    (global.set $rm (i32.const 0))
-    (global.set $seg (i32.const 0))
-    (global.set $seg_override (i32.const 0))
-    (global.set $ea (i32.const 0))
-
-    (memory.fill (i32.const 0) (i32.const 0) (i32.const 1048615))
   )
 
 
@@ -3679,6 +3677,35 @@
     ;)
   )
 
+  ;; The following OpCodes are only valid when a co-processor like x87 is present; but since we are
+  ;; emulating this on fast, modern hardware, and co-processors were very rare and expensive back then; 
+  ;; emulating a 8087 is out of this project's scope, and therefore considered invalid.
+  (func $0xd8 (; ESC 0 ;)
+    unreachable
+  )
+  (func $0xd9 (; ESC 1 ;)
+    unreachable
+  )
+  (func $0xda (; ESC 2 ;)
+    unreachable
+  )
+  (func $0xdb (; ESC 3 ;)
+    unreachable
+  )
+  (func $0xdc (; ESC 4 ;)
+    unreachable
+  )
+  (func $0xdd (; ESC 5 ;)
+    unreachable
+  )
+  (func $0xde (; ESC 6 ;)
+    unreachable
+  )
+  (func $0xdf (; ESC 7 ;)
+    unreachable
+  )
+
+
   (; OpCode Extensions (http://www.mlsite.net/8086/#tbl_ext) ;)
   (func $GRP1/8 (param $destination i32) (param $source i32)
     (call $register.general.set8
@@ -3965,15 +3992,11 @@
   ;; Most illegal OpCodes would just map to other documented instructions (e.g., 0x60 - 0x6f --> 0x70 – 0x7f);
   ;; while a few others such as 'SALC' actually did something useful.
   ;;
-  ;; However, a real 8086 (or anything earlier than 80186) would do nothing when encountering a truly invalid OpCode (hence the nop in $UNDF).
+  ;; However, a real 8086 (or anything earlier than 80186) would do nothing when encountering a truly invalid OpCode.
   ;; This emulator aims to be fully compatible _only_ (i.e., no co-processors) with the original 8086, so it supports the 
   ;; redundant OpCodes or others like 'SALC'.  Also, several OpCodes (e.g. 0xd8 - 0xdf) are only valid when a co-processor like x87 is present; 
   ;; but since we are emulating this on fast, modern hardware, and co-processors were very rare and expensive back then; 
   ;; emulating a 8087 is out of this project's scope, and therefore considered invalid.
-  (func $UNDF (; illegal instruction ;)
-    nop
-  )
-
   (func $0x0f (; POP CS ;)
     (call $register.segment.set 
       (global.get $CS)
