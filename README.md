@@ -45,9 +45,16 @@ The emulator has been thoroughly documented, except in places where doing so wou
 
 | Emulation Capability | Current Status |
 | :--- | ---: |
-| Instructions | All (Including illegal OpCodes) except for interrupts |
+| Instructions <sup>1</sup> | All, including illegal OpCodes |
 | Registers | Both User-accessible registers and Reserved Flags are available |
 | RAM | Supports up to 2^20 unique segmentated addresses with 16/8 Bit interfaces for interactions |
-| Multimedia (GPU, sound, etc) | - |
+| Multimedia (GPU, sound, etc) <sup>2</sup> | - |
 
-##### emulating external hardware, a graphical display or interrupts should be easy given that the basis required for them is already finished.
+---
+
+<sub>
+1-Interupts or Instructions that require physical hardware access are not implemented. <br>
+2-emulating external hardware, a graphical display or interrupts should be easy given that the basis required for them is already finished. <br>
+</sub>
+
+---
