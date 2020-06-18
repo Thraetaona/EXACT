@@ -127,7 +127,7 @@
    ; Export Section
    ;)
   (export "memory" (memory 0))
-  (export "execute" (func $execute))
+  (export "run" (func $run))
   (export "IP" (global $IP))
   (export "programLength" (global $program_length))
 
@@ -182,12 +182,12 @@
   (global $IP (mut i32) (i32.const 0)) ;; 0; Instruction pointer
   ;; Length of the current program (Number of bytes) that is loaded in memory.  We can not use any methods other than assigning a variable
   ;; to program's length. As an example, if we were to use a 'Sentinent byte' (i.e., Pre-defining a value to represent 'Undefined' in JavaScript
-  ;; and then inserting it at the end of readen binaries (Since JavaScript's 'Undefined' is equal to 0 (i32 Zero) in WebAssembly)), then we could
-  ;; not guarantee the correct emulation of non-standard program; to further clarify, suppose we are choosing a Sentinent value (byte) that is not
-  ;; a legal and documented OpCode, that leaves us with 23[1] out of 256 (0xff) options, but the 8086 (And anything earlier than a 80186) do nothing upon
-  ;; encountering an illegal OpCode (Basically a no-op), now if the user or the assembler decides to put one of those illegal OpCodes in
-  ;; their binary file, our emulator would immediately terminate the program once it saw that Sentinent byte (False positive); while the expected
-  ;; behaviour was to ignore the said byte and continue execution.
+  ;; and then inserting it at the end of readen binaries (Since there aren't any _efficient_ ways to check for JavaScript's 'Undefined' in WebAssembly)), 
+  ;; then we could not guarantee the correct emulation of non-standard program, also that would add an overhead of 1 byte; to further clarify,
+  ;; suppose we are choosing a Sentinent value (byte) that is not a legal and documented OpCode, that leaves us with 23[1] out of 256 (0xff) options,
+  ;; but the 8086 (And anything earlier than a 80186) do nothing upon encountering an illegal OpCode (Basically a no-op), now if the user or the assembler
+  ;; decides to put one of those illegal OpCodes in their binary file, our emulator would immediately terminate the program once it saw that Sentinent byte
+  ;; (False positive); while the expected behaviour was to ignore the said byte and continue execution.
   ;;
   ;; [1]: the number is actually 0.  considering that some illegal OpCodes such as 'SALC' actually did something useful, we emulate those, too.
   ;; Other illegal OpCodes either mapped to another one (e.g., 0x60 - 0x6f --> 0x70 – 0x7f), or did not do anything _noticeable_ at all (Like writing
@@ -262,8 +262,8 @@
     $0xb0 $0xb1 $0xb2 $0xb3 $0xb4 $0xb5 $0xb6 $0xb7 $0xb8 $0xb9 $0xba $0xbb $0xbc $0xbd $0xbe $0xbf (; B ;)
     $0xc0 $0xc1 $0xc2 $0xc3 $0xc4 $0xc5 $0xc6 $0xc7 $0xc8 $0xc9 $0xca $0xcb $0xcc $0xcd $0xce $0xcf (; C ;)
     $0xd0 $0xd1 $0xd2 $0xd3 $0xd4 $0xd5 $0xd6 $0xd7 $0xd8 $0xd9 $0xda $0xdb $0xdc $0xdd $0xde $0xdf (; D ;)
-(;    $0xe0 $0xe1 $0xe2 $0xe3 $0xe4 $0xe5 $0xe6 $0xe7 $0xe8 $0xe9 $0xea $0xeb $0xec $0xed $0xee $0xef (; E ;)
-    $0xf0 $0xf1 $0xf2 $0xf3 $0xf4 $0xf5 $0xf6 $0xf7 $0xf8 $0xf9 $0xfa $0xfb $0xfc $0xfd $0xfe $0xff (; F ;) ;)
+    $0xe0 $0xe1 $0xe2 $0xe3 $0xe4 $0xe5 $0xe6 $0xe7 $0xe8 $0xe9 $0xea $0xeb $0xec $0xed $0xee $0xef (; E ;)
+    $0xf0 $0xf1 $0xf2 $0xf3 $0xf4 $0xf5 $0xf6 $0xf7 $0xf8 $0xf9 $0xfa $0xfb $0xfc $0xfd $0xfe $0xff (; F ;)
   )
 
 
@@ -278,24 +278,24 @@
   ;)
 
 
-  (func $execute
+  (func $run
     ;; Combination of a block alongside this loop will form a 'do-while' loop.
-    (block (loop $eu ;; Execution Unit
+    (block (loop
       ;; Stops the execution (Jumps out) if the program has reached it's end.
       (br_if 1 (i32.ge_u (global.get $IP) (global.get $program_length)))
 
+      call $execute
 
-      (call_indirect (block (result i32) ;; Bus Interface Unit          
+      br 0 ;; This will return to the top of this loop.
+    ))
+  )
+
+  (func $execute
+      (call_indirect (block (result i32)
                        (call $ram.get8 (call $register.segment.get (global.get $CS)) (global.get $IP)) ;; BIU | fetching instructions from memory
                        (call $step_ip (i32.const 1)) ;; Reading from memory should increment $IP by one.
                      )
       )
-
-      (global.set $seg (call $register.segment.get (global.get $DS)))
-      (global.set $seg_override (i32.const 0))
-
-      br 0 ;; This will return to the top of this loop.
-    ))
   )
 
 
@@ -604,7 +604,7 @@
   ;; This will increment IP by the given amount.
   (func $step_ip (param $value i32)
     (global.set $IP
-      (i32.rem_u
+      (i32.and
         (i32.add
           (global.get $IP)
           (local.get $value)
@@ -1160,12 +1160,9 @@
 
   ;; Conditionally jumps ahead (or backwards) in the code.
   (func $jump (param $condition i32) (param $amount i32)
-    (global.set $IP
-      (i32.add
-        (global.get $IP)
-        (select (local.get $amount) (i32.const 0)
-                (local.get $condition))
-      )
+    (call $step_ip
+      (select (local.get $amount) (i32.const 0)
+              (local.get $condition))
     )
   )
 
@@ -1706,6 +1703,9 @@
     (global.set $seg_override (i32.const 1))
 
     call $execute
+
+    (global.set $seg (call $register.segment.get (global.get $DS)))
+    (global.set $seg_override (i32.const 0))
   )
 
   ;; https://www.gabrielececchetti.it/Teaching/CalcolatoriElettronici/Docs/i8086_instruction_set.pdf
@@ -1867,6 +1867,9 @@
     (global.set $seg_override (i32.const 1))
 
     call $execute
+
+    (global.set $seg (call $register.segment.get (global.get $DS)))
+    (global.set $seg_override (i32.const 0))
   )
 
   ;; https://www.gabrielececchetti.it/Teaching/CalcolatoriElettronici/Docs/i8086_instruction_set.pdf
@@ -2009,6 +2012,9 @@
     (global.set $seg_override (i32.const 1))
 
     call $execute
+
+    (global.set $seg (call $register.segment.get (global.get $DS)))
+    (global.set $seg_override (i32.const 0))
   )
 
   ;; https://www.gabrielececchetti.it/Teaching/CalcolatoriElettronici/Docs/i8086_instruction_set.pdf
@@ -2148,6 +2154,9 @@
     (global.set $seg_override (i32.const 1))
 
     call $execute
+
+    (global.set $seg (call $register.segment.get (global.get $DS)))
+    (global.set $seg_override (i32.const 0))
   )
 
   ;; https://www.gabrielececchetti.it/Teaching/CalcolatoriElettronici/Docs/i8086_instruction_set.pdf
@@ -2199,149 +2208,293 @@
   )
 
   (func $0x40 (; INC AX ;)
+    global.get $CF
+    call $register.flag.get
+
     (call $register.general.set16 
       (global.get $AX)
-      (i32.add
+      (call $checked_add 
+        (i32.const 1) ;; 16-Bit
+        (i32.const 0) ;; Addition
+        (i32.const 0) ;; Carry
         (call $register.general.get8 (global.get $AX))
         (i32.const 1)
       )
     )
+
+    global.get $CF
+    call $register.flag.set
   )
   (func $0x41 (; INC CX ;)
+    global.get $CF
+    call $register.flag.get
+
     (call $register.general.set16 
       (global.get $CX)
-      (i32.add
+      (call $checked_add 
+        (i32.const 1) ;; 16-Bit
+        (i32.const 0) ;; Addition
+        (i32.const 0) ;; Carry
         (call $register.general.get8 (global.get $CX))
         (i32.const 1)
       )
     )
+
+    global.get $CF
+    call $register.flag.set
   )
   (func $0x42 (; INC DX ;)
+    global.get $CF
+    call $register.flag.get
+
     (call $register.general.set16 
       (global.get $DX)
-      (i32.add
+      (call $checked_add 
+        (i32.const 1) ;; 16-Bit
+        (i32.const 0) ;; Addition
+        (i32.const 0) ;; Carry
         (call $register.general.get8 (global.get $DX))
         (i32.const 1)
       )
     )
+
+    global.get $CF
+    call $register.flag.set
   )
   (func $0x43 (; INC BX ;)
+    global.get $CF
+    call $register.flag.get
+
     (call $register.general.set16 
       (global.get $BX)
-      (i32.add
+      (call $checked_add 
+        (i32.const 1) ;; 16-Bit
+        (i32.const 0) ;; Addition
+        (i32.const 0) ;; Carry
         (call $register.general.get8 (global.get $BX))
         (i32.const 1)
       )
     )
+
+    global.get $CF
+    call $register.flag.set
   )
   (func $0x44 (; INC SP ;)
+    global.get $CF
+    call $register.flag.get
+
     (call $register.general.set16 
       (global.get $SP)
-      (i32.add
+      (call $checked_add 
+        (i32.const 1) ;; 16-Bit
+        (i32.const 0) ;; Addition
+        (i32.const 0) ;; Carry
         (call $register.general.get8 (global.get $SP))
         (i32.const 1)
       )
     )
+
+    global.get $CF
+    call $register.flag.set
   )
   (func $0x45 (; INC BP ;)
+    global.get $CF
+    call $register.flag.get
+
     (call $register.general.set16 
       (global.get $BP)
-      (i32.add
+      (call $checked_add 
+        (i32.const 1) ;; 16-Bit
+        (i32.const 0) ;; Addition
+        (i32.const 0) ;; Carry
         (call $register.general.get8 (global.get $BP))
         (i32.const 1)
       )
     )
+
+    global.get $CF
+    call $register.flag.set
   )
   (func $0x46 (; INC SI ;)
+    global.get $CF
+    call $register.flag.get
+
     (call $register.general.set16 
       (global.get $SI)
-      (i32.add
+      (call $checked_add 
+        (i32.const 1) ;; 16-Bit
+        (i32.const 0) ;; Addition
+        (i32.const 0) ;; Carry
         (call $register.general.get8 (global.get $SI))
         (i32.const 1)
       )
     )
+
+    global.get $CF
+    call $register.flag.set
   )
   (func $0x47 (; INC DI ;)
+    global.get $CF
+    call $register.flag.get
+
     (call $register.general.set16 
       (global.get $DI)
-      (i32.add
+      (call $checked_add 
+        (i32.const 1) ;; 16-Bit
+        (i32.const 0) ;; Addition
+        (i32.const 0) ;; Carry
         (call $register.general.get8 (global.get $DI))
         (i32.const 1)
       )
     )
+
+    global.get $CF
+    call $register.flag.set
   )  
 
   (func $0x48 (; DEC AX ;)
+    global.get $CF
+    call $register.flag.get
+
     (call $register.general.set16 
       (global.get $AX)
-      (i32.sub
+      (call $checked_add 
+        (i32.const 1) ;; 16-Bit
+        (i32.const 1) ;; Subtraction
+        (i32.const 0) ;; Carry
         (call $register.general.get8 (global.get $AX))
         (i32.const 1)
       )
     )
+
+    global.get $CF
+    call $register.flag.set
   )
   (func $0x49 (; DEC CX ;)
+    global.get $CF
+    call $register.flag.get
+
     (call $register.general.set16 
       (global.get $CX)
-      (i32.sub
+      (call $checked_add 
+        (i32.const 1) ;; 16-Bit
+        (i32.const 1) ;; Subtraction
+        (i32.const 0) ;; Carry
         (call $register.general.get8 (global.get $CX))
         (i32.const 1)
       )
     )
+
+    global.get $CF
+    call $register.flag.set
   )
   (func $0x4a (; DEC DX ;)
+    global.get $CF
+    call $register.flag.get
+
     (call $register.general.set16 
       (global.get $DX)
-      (i32.sub
+      (call $checked_add 
+        (i32.const 1) ;; 16-Bit
+        (i32.const 1) ;; Subtraction
+        (i32.const 0) ;; Carry
         (call $register.general.get8 (global.get $DX))
         (i32.const 1)
       )
     )
+
+    global.get $CF
+    call $register.flag.set
   )
   (func $0x4b (; DEC BX ;)
+    global.get $CF
+    call $register.flag.get
+
     (call $register.general.set16 
       (global.get $BX)
-      (i32.sub
+      (call $checked_add 
+        (i32.const 1) ;; 16-Bit
+        (i32.const 1) ;; Subtraction
+        (i32.const 0) ;; Carry
         (call $register.general.get8 (global.get $BX))
         (i32.const 1)
       )
     )
+
+    global.get $CF
+    call $register.flag.set
   )
   (func $0x4c (; DEC SP ;)
+    global.get $CF
+    call $register.flag.get
+
     (call $register.general.set16 
       (global.get $SP)
-      (i32.sub
+      (call $checked_add 
+        (i32.const 1) ;; 16-Bit
+        (i32.const 1) ;; Subtraction
+        (i32.const 0) ;; Carry
         (call $register.general.get8 (global.get $SP))
         (i32.const 1)
       )
     )
+
+    global.get $CF
+    call $register.flag.set
   )
   (func $0x4d (; DEC BP ;)
+    global.get $CF
+    call $register.flag.get
+
     (call $register.general.set16 
       (global.get $BP)
-      (i32.sub
+      (call $checked_add 
+        (i32.const 1) ;; 16-Bit
+        (i32.const 1) ;; Subtraction
+        (i32.const 0) ;; Carry
         (call $register.general.get8 (global.get $BP))
         (i32.const 1)
       )
     )
+
+    global.get $CF
+    call $register.flag.set
   )
   (func $0x4e (; DEC SI ;)
+    global.get $CF
+    call $register.flag.get
+
     (call $register.general.set16 
       (global.get $SI)
-      (i32.sub
+      (call $checked_add 
+        (i32.const 1) ;; 16-Bit
+        (i32.const 1) ;; Subtraction
+        (i32.const 0) ;; Carry
         (call $register.general.get8 (global.get $SI))
         (i32.const 1)
       )
     )
+
+    global.get $CF
+    call $register.flag.set
   )
   (func $0x4f (; DEC DI ;)
+    global.get $CF
+    call $register.flag.get
+
     (call $register.general.set16 
       (global.get $DI)
-      (i32.sub
+      (call $checked_add 
+        (i32.const 1) ;; 16-Bit
+        (i32.const 1) ;; Subtraction
+        (i32.const 0) ;; Carry
         (call $register.general.get8 (global.get $DI))
         (i32.const 1)
       )
     )
+
+    global.get $CF
+    call $register.flag.set
   )
   
   (func $0x50 (; PUSH AX ;)
@@ -2996,18 +3149,14 @@
   
   ;; this is a far call, so CS and IP are also pushed on to the stack (https://c9x.me/x86/html/file_module_x86_id_26.html).
   (func $0x9a (; CALL Ap ;)
-    (global.set $IP
-      (block (result i32)
-        (call $ram.get16 (call $register.segment.get (global.get $CS) (global.get $IP)))
-        (call $step_ip (i32.const 2))
-      )
+    (block (result i32)
+      (call $ram.get16 (call $register.segment.get (global.get $CS) (global.get $IP)))
+      (call $step_ip (i32.const 2))
     )
-    (call $register.segment.set
-      (global.get $CS)
-      (block (result i32)
-        (call $ram.get16 (call $register.segment.get (global.get $CS) (global.get $IP)))
-        (call $step_ip (i32.const 2))
-      )
+
+    (block (result i32)
+      (call $ram.get16 (call $register.segment.get (global.get $CS) (global.get $IP)))
+      (call $step_ip (i32.const 2))
     )
 
     (call $push
@@ -3015,7 +3164,12 @@
     )
     (call $push
       (global.get $IP)
-    )
+    )  
+
+    global.get $CS
+    call $register.segment.set
+
+    global.set $IP
   )
 
   ;; This is just an emulator, we do not have physical access to the hardware.
@@ -3707,17 +3861,469 @@
     unreachable
   )
 
+  (func $0xe0 (; LOOPNZ Jb ;)
+    (call $jump 
+      (i32.and
+        (select (i32.const 1) (i32.const 0)
+                (block (result i32)
+                  (call $register.general.set16
+                    (global.get $CX)
+                    (i32.sub
+                      (call $register.general.get16 (global.get $CX))
+                      (i32.const 1)
+                    )
+                  )
+                  (call $register.general.get16 (global.get $CX))
+                ))
+        (i32.eqz (call $register.flag.get (global.get $ZF)))
+      )
+      (call $i16.extend8_s
+        (block (result i32)
+          (call $ram.get8 (call $register.segment.get (global.get $CS)) (global.get $IP))
+          (call $step_ip (i32.const 1))
+        )
+      )
+    )
+  )
+  (func $0xe1 (; LOOPZ Jb ;)
+    (call $jump 
+      (i32.and
+        (select (i32.const 1) (i32.const 0)
+                (block (result i32)
+                  (call $register.general.set16
+                    (global.get $CX)
+                    (i32.sub
+                      (call $register.general.get16 (global.get $CX))
+                      (i32.const 1)
+                    )
+                  )
+                  (call $register.general.get16 (global.get $CX))
+                ))
+        (global.get $ZF)
+      )
+      (call $i16.extend8_s
+        (block (result i32)
+          (call $ram.get8 (call $register.segment.get (global.get $CS)) (global.get $IP))
+          (call $step_ip (i32.const 1))
+        )
+      )
+    )
+  )
+  (func $0xe2 (; LOOP Jb ;)
+    (call $jump 
+      (select (i32.const 1) (i32.const 0)
+              (block (result i32)
+                (call $register.general.set16
+                  (global.get $CX)
+                  (i32.sub
+                    (call $register.general.get16 (global.get $CX))
+                    (i32.const 1)
+                  )
+                )
+                (call $register.general.get16 (global.get $CX))
+              ))
+      (call $i16.extend8_s
+        (block (result i32)
+          (call $ram.get8 (call $register.segment.get (global.get $CS)) (global.get $IP))
+          (call $step_ip (i32.const 1))
+        )
+      )
+    )
+  )
+  (func $0xe3 (; LOOP Jb ;)
+    (call $jump 
+      (i32.eqz
+        (block (result i32)
+          (call $register.general.set16
+            (global.get $CX)
+            (i32.sub
+              (call $register.general.get16 (global.get $CX))
+              (i32.const 1)
+            )
+          )
+          (call $register.general.get16 (global.get $CX))
+        )
+      )
+      (call $i16.extend8_s
+        (block (result i32)
+          (call $ram.get8 (call $register.segment.get (global.get $CS)) (global.get $IP))
+          (call $step_ip (i32.const 1))
+        )
+      )
+    )
+  )
+
+  ;; This is just an emulator, we do not have physical access to the hardware.
+  (func $0xe4 (; IN AL, Ib ;)
+    unreachable
+  )
+  (func $0xe5 (; IN AX, Ib ;)
+    unreachable
+  )
+  (func $0xe6 (; OUT IB, AL ;)
+    unreachable
+  )
+  (func $0xe7 (; OUT IB, AX ;)
+    unreachable
+  )
+
+  (func $0xe8 (; CALL Jv ;)
+    (call $step_ip
+      (block (result i32)
+        (call $ram.get16 (call $register.segment.get (global.get $CS) (global.get $IP)))
+        (call $step_ip (i32.const 2))
+
+        (call $push (global.get $IP))
+      )
+    )
+  )
+
+  (func $0xe9 (; JMP Jv ;)
+    (call $jump 
+      (i32.const 1)
+      (block (result i32)
+        (call $ram.get16 (call $register.segment.get (global.get $CS)) (global.get $IP))
+        (call $step_ip (i32.const 2))
+      )
+    )
+  )
+  (func $0xea (; JMP Ap ;)
+    (block (result i32)
+      (call $ram.get16 (call $register.segment.get (global.get $CS) (global.get $IP)))
+      (call $step_ip (i32.const 2))
+    )
+
+    (block (result i32)
+      (call $ram.get16 (call $register.segment.get (global.get $CS) (global.get $IP)))
+      (call $step_ip (i32.const 2))
+    ) 
+
+    global.get $CS
+    call $register.segment.set
+
+    global.set $IP
+  )
+  (func $0xeb (; JMP Jb ;)
+    (call $jump 
+      (i32.const 1)
+      (call $i16.extend8_s
+        (block (result i32)
+          (call $ram.get8 (call $register.segment.get (global.get $CS)) (global.get $IP))
+          (call $step_ip (i32.const 1))
+        )
+      )
+    )
+  )
+
+  (func $0xec (; IN AL, DX ;)
+    unreachable
+  )
+  (func $0xed (; IN AX, DX ;)
+    unreachable
+  )
+  (func $0xee (; OUT DX, AL ;)
+    unreachable
+  )
+  (func $0xef (; OUT DX, AX ;)
+    unreachable
+  )
+
+  ;; EXACT only emulates a single 8086, so LOCK should not be needed in a system with only a single processor, however
+  ;; WebAssembly's threads (atomic) proposal could be used incase this is getting implemented.
+  ;; https://github.com/WebAssembly/threads/blob/master/proposals/threads/Overview.md
+  (func $0xf0 (; LOCK ;)
+    nop
+  )
+
+  (func $0xf2 (local $opcode i32) (; REPNZ/REPNE ;)
+    (local.set $opcode
+      (block (result i32)
+        (call $ram.get8 (call $register.segment.get (global.get $CS)) (global.get $IP))
+        (call $step_ip (i32.const 1))
+      )
+    )
+
+    (if
+      (i32.or
+        (i32.or
+          (i32.or
+            (i32.or (i32.eq (local.get $opcode) (i32.const 0xa4)) (i32.eq (local.get $opcode) (i32.const 0xa5)))
+            (i32.or (i32.eq (local.get $opcode) (i32.const 0xa6)) (i32.eq (local.get $opcode) (i32.const 0xa7)))
+          )
+          (i32.or
+            (i32.or (i32.eq (local.get $opcode) (i32.const 0xaa)) (i32.eq (local.get $opcode) (i32.const 0xab)))
+            (i32.or (i32.eq (local.get $opcode) (i32.const 0xac)) (i32.eq (local.get $opcode) (i32.const 0xad)))
+          )
+        )
+        (i32.or (i32.eq (local.get $opcode) (i32.const 0xae)) (i32.eq (local.get $opcode) (i32.const 0xaf)))
+      )
+      (then
+        (block (loop
+          (br_if 1 (i32.eqz (call $register.general.get16 (global.get $CX))))
+
+          (call_indirect (local.get $opcode))
+
+          (call $register.general.set16
+            (global.get $CX)
+            (i32.sub
+              (call $register.general.get16 (global.get $CX))
+              (i32.const 1)
+            )
+          )
+
+          (br_if 0 (i32.eqz (call $register.flag.get (global.get $ZF))))
+        ))
+      )
+    )
+  )
+  (func $0xf3 (local $opcode i32) (; REPZ/REPE/REP ;)
+    (local.set $opcode
+      (block (result i32)
+        (call $ram.get8 (call $register.segment.get (global.get $CS)) (global.get $IP))
+        (call $step_ip (i32.const 1))
+      )
+    )
+
+    (if
+      (i32.or
+        (i32.or
+          (i32.or
+            (i32.or (i32.eq (local.get $opcode) (i32.const 0xa4)) (i32.eq (local.get $opcode) (i32.const 0xa5)))
+            (i32.or (i32.eq (local.get $opcode) (i32.const 0xa6)) (i32.eq (local.get $opcode) (i32.const 0xa7)))
+          )
+          (i32.or
+            (i32.or (i32.eq (local.get $opcode) (i32.const 0xaa)) (i32.eq (local.get $opcode) (i32.const 0xab)))
+            (i32.or (i32.eq (local.get $opcode) (i32.const 0xac)) (i32.eq (local.get $opcode) (i32.const 0xad)))
+          )
+        )
+        (i32.or (i32.eq (local.get $opcode) (i32.const 0xae)) (i32.eq (local.get $opcode) (i32.const 0xaf)))
+      )
+      (then
+        (block (loop
+          (br_if 1 (i32.eqz (call $register.general.get16 (global.get $CX))))
+
+          (call_indirect (local.get $opcode))
+
+          (call $register.general.set16
+            (global.get $CX)
+            (i32.sub
+              (call $register.general.get16 (global.get $CX))
+              (i32.const 1)
+            )
+          )
+
+          (br_if 0 (i32.eq (call $register.flag.get (global.get $ZF)) (i32.const 1)))
+        ))
+      )
+    )
+  )
+  (func $0xf4 (; HLT ;)
+    (global.set $program_length
+      (global.get $IP)
+    )
+  )
+
+  (func $0xf5 (; CMC ;)
+    (call $register.flag.set 
+      (global.get $CF)
+      (call $i32.not (call $register.flag.get (global.get $CF)))
+    )
+  )
+
+  (func $0xf6 (; GRP3a Eb ;)
+    call $parse_address
+    
+    (call $GRP3
+      (i32.const 0)
+      (call $logical_read8)
+    )
+  )
+  (func $0xf7 (; GRP3b Ev ;)
+    call $parse_address
+    
+    (call $GRP3
+      (i32.const 1)
+      (call $logical_read16)
+    )
+  )
+
+  (func $0xf8 (; CLC ;)
+    (call $register.flag.set
+      (global.get $CF)
+      (i32.const 0)
+    )
+  )
+  (func $0xf9 (; STC ;)
+    (call $register.flag.set
+      (global.get $CF)
+      (i32.const 1)
+    )
+  )
+  (func $0xfa (; CLI ;)
+    (call $register.flag.set
+      (global.get $IF)
+      (i32.const 0)
+    )
+  )
+  (func $0xfb (; STI ;)
+    (call $register.flag.set
+      (global.get $IF)
+      (i32.const 1)
+    )
+  )
+  (func $0xfc (; CLD ;)
+    (call $register.flag.set
+      (global.get $DF)
+      (i32.const 0)
+    )
+  )
+  (func $0xfd (; STD ;)
+    (call $register.flag.set
+      (global.get $DF)
+      (i32.const 1)
+    )
+  )
+
+  (func $0xfe (; GRP4 Eb ;)
+    call $parse_address
+
+
+    global.get $CF
+    call $register.flag.get
+
+    (call $logical_write8
+      (select 
+        (call $checked_add 
+          (i32.const 0) ;; 8-Bit
+          (i32.const 1) ;; Subtraction
+          (i32.const 0) ;; Carry
+          (call $logical_read8)
+          (i32.const 1)
+        )
+        (call $checked_add 
+          (i32.const 0) ;; 8-Bit
+          (i32.const 0) ;; Addition
+          (i32.const 0) ;; Carry
+          (call $logical_read8)
+          (i32.const 1)
+        )
+        (global.get $reg))
+    )
+
+    global.get $CF
+    call $register.flag.set
+  )
+  (func $0xff (; GRP5 Ev ;)
+    call $parse_address
+
+
+    (block (block (block (block (block (block (block (global.get $reg)
+                (br_table
+                  0         ;; reg == {0} --> (br 0)[INC]
+                  1         ;; reg == {1} --> (br 1)[DEC]
+                  2         ;; reg == {2} --> (br 2)[CALL]
+                  3         ;; reg == {3} --> (br 3)[CALL Mp]
+                  4         ;; reg == {4} --> (br 4)[JMP]
+                  5         ;; reg == {5} --> (br 5)[JMP Mp]
+                  6         ;; 0 > reg OR reg >= 6 --> (br 7 (Default))[PUSH]
+                ))
+                ;; Target for (br 0)
+                (block
+                  (call $logical_write16
+                    (call $checked_add 
+                      (i32.const 1) ;; 8-Bit
+                      (i32.const 0) ;; Addition
+                      (i32.const 0) ;; Carry
+                      (call $logical_read16)
+                      (i32.const 1)
+                    )
+                  )
+
+                  return
+                ))
+              ;; Target for (br 1)
+              (block
+                (call $logical_write16
+                  (call $checked_add 
+                    (i32.const 1) ;; 8-Bit
+                    (i32.const 1) ;; Subtraction
+                    (i32.const 0) ;; Carry
+                    (call $logical_read16)
+                    (i32.const 1)
+                  )
+                )
+
+                return
+              ))
+            ;; Target for (br 2)
+            (block
+              (call $push
+                (global.get $IP)
+              )  
+              (global.set $IP
+                (call $logical_read16)
+              )
+
+              return
+            ))
+          ;; Target for (br 3)
+          (block
+            (call $push
+              (call $register.segment.get (global.get $CS))
+            )
+            (call $push
+              (global.get $IP)
+            )  
+
+            (global.set $IP
+              (i32.load16_u offset=40 (global.get $ea))
+            )
+            (call $register.segment.set
+              (global.get $CS)
+              (i32.load16_u offset=40 (i32.add (global.get $ea) (i32.const 2)))
+            )
+
+            return
+          ))
+        ;; Target for (br 4)
+        (block
+          (global.set $IP
+            (call $logical_read16)
+          )
+
+          return
+        ))
+      ;; Target for (br 5)
+      (block
+        (global.set $IP
+          (i32.load16_u offset=40 (global.get $ea))
+        )
+        (call $register.segment.set
+          (global.get $CS)
+          (i32.load16_u offset=40 (i32.add (global.get $ea) (i32.const 2)))
+        )
+
+        return
+      ))
+    ;; (Default) Target for (br 6)
+    (block
+      (call $push
+        (call $logical_read16)
+      )
+
+      return
+    )
+  )
+
 
   (; OpCode Extensions (http://www.mlsite.net/8086/#tbl_ext) ;)
   (func $GRP1/8 (param $destination i32) (param $source i32)
-    (call $register.general.set8
-      (global.get $rm)
+    (call $logical_write8
       (call $GRP1 (i32.const 0) (local.get $destination) (local.get $source))
     )
   )
   (func $GRP1/16 (param $destination i32) (param $source i32)
-    (call $register.general.set16
-      (global.get $rm)
+    (call $logical_write16
       (call $GRP1 (i32.const 1) (local.get $destination) (local.get $source))
     )
   )
@@ -3808,124 +4414,84 @@
   )
 
   (func $GRP2/8 (param $destination i32) (param $source i32)
-    (call $register.general.set8
-      (global.get $rm)
+    (call $logical_write8
       (call $GRP2 (i32.const 0) (local.get $destination) (local.get $source))
     )
   )
   (func $GRP2/16 (param $destination i32) (param $source i32)
-    (call $register.general.set16
-      (global.get $rm)
+    (call $logical_write16
       (call $GRP2 (i32.const 1) (local.get $destination) (local.get $source))
     )
   )
   (func $GRP2 (param $mode i32) (param $destination i32) (param $source i32)
               (result i32) 
               (local $temp i32)
-    (block (block (block (block (block (block (block (block (global.get $reg)
-                  (br_table
-                    0         ;; reg == {0} --> (br 0)[ROL]
-                    1         ;; reg == {1} --> (br 1)[ROR]
-                    2         ;; reg == {2} --> (br 2)[RCL]
-                    3         ;; reg == {3} --> (br 3)[RCR]
-                    4         ;; reg == {4} --> (br 4)[SHL]
-                    5         ;; reg == {5} --> (br 5)[SHR]
-                    6         ;; reg == {6} --> (br 6)[UNDF]
-                    7         ;; 0 > reg OR reg >= 7 --> (br 7 (Default))[SAR]
-                  ))
-                  ;; Target for (br 0)
-                  (block
-                    (local.set $temp (i32.rotl (local.get $destination) (local.get $source)))
-
-                    (call $register.flag.set 
-                      (global.get $CF)
-                      (i32.shr_u (local.get $destination) (i32.const 15))  
-                    )
-
-                    (call $register.flag.set 
-                      (global.get $OF) 
-                      (i32.ne 
-                        (select (i32.const 1) (i32.const 0)
-                          (i32.shr_s 
-                            (i32.shl (local.get $temp) (select (i32.const 16) (i32.const 24)
-                                                                (local.get $mode)))
-                            (i32.const 31)
-                          )
-                        )
-                        (global.get $CF)
-                      )
-                    )
-
-                    (return (local.get $temp))
-                  ))
-                ;; Target for (br 1)
+    (block (block (block (block (block (block (block (global.get $reg)
+                (br_table
+                  0         ;; reg == {0} --> (br 0)[ROL]
+                  1         ;; reg == {1} --> (br 1)[ROR]
+                  2         ;; reg == {2} --> (br 2)[RCL]
+                  3         ;; reg == {3} --> (br 3)[RCR]
+                  4         ;; reg == {4} --> (br 4)[SHL]
+                  5         ;; reg == {5} --> (br 5)[SHR]
+                  6         ;; 0 > reg OR reg >= 6 --> (br 7 (Default))[SAR]
+                ))
+                ;; Target for (br 0)
                 (block
-                  (local.set $temp (i32.rotr (local.get $destination) (local.get $source)))
+                  (local.set $temp (i32.rotl (local.get $destination) (local.get $source)))
 
                   (call $register.flag.set 
                     (global.get $CF)
-                    (i32.and (local.get $destination) (i32.const 1))  
+                    (i32.shr_u (local.get $destination) (i32.const 15))  
                   )
 
                   (call $register.flag.set 
-                    (global.get $OF) 
-                    (i32.ne 
-                      (select (i32.const 1) (i32.const 0)
-                        (i32.shr_s 
-                          (i32.shl (local.get $temp) (select (i32.const 16) (i32.const 24)
-                                                              (local.get $mode)))
-                          (i32.const 31)
-                        )
+                    (global.get $CF) 
+                    (i32.and (local.get $destination) (i32.const 1))
+                  )
+
+                  (call $register.flag.set
+                    (global.get $OF)
+                    (i32.xor
+                      (i32.shr_u (local.get $destination) (select (i32.const 15) (i32.const 7)
+                                                          (local.get $mode))
                       )
-                      (global.get $CF)
+                      (call $register.flag.get (global.get $CF))
                     )
                   )
 
                   (return (local.get $temp))
                 ))
-              ;; Target for (br 2)
+              ;; Target for (br 1)
               (block
-                (local.set $temp 
-                  (i32.rotl
-                    (i32.or ;; Adds $CF to the extended input (RCL rotates through the carry flag).
-                      (call $register.flag.get (global.get $CF))
-                      (i32.shl (local.get $destination) (i32.const 1)) ;; Extends the input by 1 bit.
-                    )
-                    (local.get $source)
+                (local.set $temp (i32.rotr (local.get $destination) (local.get $source)))
+
+                (call $register.flag.set 
+                  (global.get $CF) 
+                  (i32.shr_u (local.get $temp) (select (i32.const 15) (i32.const 7)
+                                              (local.get $mode))
                   )
                 )
 
-                (call $register.flag.set 
-                  (global.get $CF)
-                  (i32.and (local.get $temp) (select (i32.const 65535) (i32.const 255) 
-                                                     (local.get $mode))) ;; $CF should be set to the least significant bit.
-                )
-
-                (local.set $temp (i32.and (local.get $destination) (i32.const 1))) ;; Masks out the least significant bit.
-
-                (call $register.flag.set 
-                  (global.get $OF) 
-                  (i32.ne 
-                    (select (i32.const 1) (i32.const 0)
-                      (i32.shr_s 
-                        (i32.shl (local.get $temp) (select (i32.const 16) (i32.const 24)
-                                                            (local.get $mode)))
-                        (i32.const 31)
-                      )
+                (call $register.flag.set
+                  (global.get $OF)
+                  (i32.xor
+                    (i32.shr_u (local.get $destination) (select (i32.const 15) (i32.const 7)
+                                                         (local.get $mode))
                     )
-                    (global.get $CF)
+                    (call $register.flag.get (global.get $CF))
                   )
                 )
 
                 (return (local.get $temp))
               ))
-            ;; Target for (br 3)
+            ;; Target for (br 2)
             (block
               (local.set $temp 
-                (i32.rotr
+                (i32.rotl
                   (i32.or ;; Adds $CF to the extended input (RCL rotates through the carry flag).
-                    (i32.shl (local.get $destination) (i32.const 1)) ;; Extends the input by 1 bit.
                     (call $register.flag.get (global.get $CF))
+                    (i32.shl (local.get $destination) (i32.const 1)) ;; Extends the input by 1 bit.
                   )
                   (local.get $source)
                 )
@@ -3933,64 +4499,446 @@
 
               (call $register.flag.set 
                 (global.get $CF)
-                (i32.shr_u (local.get $temp) (select (i32.const 15) (i32.const 7)
-                                                     (local.get $mode))) ;; $CF should be set to the most significant bit.
+                (i32.shr_u (local.get $destination) (i32.const 15))  
               )
 
-              (local.set $temp (i32.shr_u (local.get $destination) (i32.const 1))) ;; Masks out the least significant bit.
-
               (call $register.flag.set 
-                (global.get $OF) 
-                (i32.ne 
-                  (select (i32.const 1) (i32.const 0)
-                    (i32.shr_s 
-                      (i32.shl (local.get $temp) (select (i32.const 16) (i32.const 24)
-                                                          (local.get $mode)))
-                      (i32.const 31)
-                    )
+                (global.get $CF) 
+                (i32.and (local.get $destination) (i32.const 1))
+              )
+
+              (call $register.flag.set
+                (global.get $OF)
+                (i32.xor
+                  (i32.shr_u (local.get $destination) (select (i32.const 15) (i32.const 7)
+                                                      (local.get $mode))
                   )
-                  (global.get $CF)
+                  (call $register.flag.get (global.get $CF))
                 )
               )
 
               (return (local.get $temp))
             ))
-          ;; Target for (br 4)
-          (return
-            (i32.and
+          ;; Target for (br 3)
+          (block
+            (local.set $temp 
+              (i32.rotr
+                (i32.or ;; Adds $CF to the extended input (RCL rotates through the carry flag).
+                  (i32.shl (local.get $destination) (i32.const 1)) ;; Extends the input by 1 bit.
+                  (call $register.flag.get (global.get $CF))
+                )
+                (local.get $source)
+              )
+            )
+
+            (call $register.flag.set 
+              (global.get $CF) 
+              (i32.shr_u (local.get $temp) (select (i32.const 15) (i32.const 7)
+                                          (local.get $mode))
+              )
+            )
+
+            (call $register.flag.set
+              (global.get $OF)
+              (i32.xor
+                (i32.shr_u (local.get $destination) (select (i32.const 15) (i32.const 7)
+                                                      (local.get $mode))
+                )
+                (call $register.flag.get (global.get $CF))
+              )
+            )
+
+            (return (local.get $temp))
+          ))
+        ;; Target for (br 4)
+        (block
+          (local.set $temp
+            (i32.shl
               (local.get $destination)
               (local.get $source)
             )
-          ))
-        ;; Target for (br 5)
-        (return
-          (call $checked_add 
-            (local.get $mode)
-            (i32.const 1) ;; Subtraction
-            (i32.const 0) ;; Carry
+          )
+
+          (call $register.flag.set 
+            (global.get $CF) 
+            (i32.shr_u (local.get $temp) (select (i32.const 16) (i32.const 8)
+                                         (local.get $mode))
+            )
+          )
+
+          (local.set $temp (i32.and (local.get $temp) (i32.const 255)))
+
+          (call $register.flag.set
+            (global.get $OF)
+            (i32.xor
+              (i32.shr_u (local.get $temp) (select (i32.const 15) (i32.const 7)
+                                                   (local.get $mode))
+              )
+              (call $register.flag.get (global.get $CF))
+            )
+          )
+
+          (local.get $temp)
+
+          return
+        ))
+      ;; Target for (br 5)
+      (block
+        (local.set $temp
+          (i32.shr_u
             (local.get $destination)
             (local.get $source)
           )
-        ))
-      ;; Target for (br 6)
-      (return
-        (i32.xor
-          (local.get $destination)
+        )
+
+        (call $register.flag.set 
+          (global.get $CF) 
+          (i32.and (local.get $destination) (i32.const 1))
+        )
+
+        (call $register.flag.set
+          (global.get $OF)
+          (i32.xor
+            (i32.shr_u (local.get $temp) (select (i32.const 15) (i32.const 7)
+                                                 (local.get $mode))
+            )
+            (i32.shr_u (local.get $destination) (select (i32.const 15) (i32.const 7)
+                                                        (local.get $mode))
+            )
+          )
+        )
+
+        (local.get $temp)
+
+        return
+      ))
+    ;; (Default) Target for (br 6)
+    (block (result i32)
+      (local.set $temp
+        (i32.shr_s
+          (i32.shr_s 
+            (i32.shl (local.get $destination) (select (i32.const 16) (i32.const 24)
+                                                      (local.get $mode))) 
+            (select (i32.const 16) (i32.const 24) 
+                    (local.get $mode))
+          )
           (local.get $source)
         )
-      ))
-    ;; (Default) Target for (br 7)
-    (return
-      (call $checked_add 
-        (local.get $mode)
-        (i32.const 1) ;; Subtraction
-        (i32.const 0) ;; Carry
-        (local.get $destination)
-        (local.get $source)
       )
+
+      (call $register.flag.set 
+        (global.get $CF) 
+        (i32.and (local.get $destination) (i32.const 1))
+      )
+
+      ;; Impossible for $OF to be enabled after performing an arithmetical right-shift.
+      (call $register.flag.set
+        (global.get $OF)
+        (i32.const 0)
+      )
+
+      (local.get $temp)
+
+      return
     )
   )
   
+  (func $GRP3 (param $mode i32) (param $destination i32)
+              (local $temp i32)
+    (block (block (block (block (block (block (block (block (global.get $reg)
+                  (br_table
+                    0         ;; reg == {0} --> (br 0)[TEST Eb, Ib / TEST Ev, Iv]
+                    1         ;; reg == {1} --> (br 1)[UNDF]
+                    2         ;; reg == {2} --> (br 2)[NOT]
+                    3         ;; reg == {3} --> (br 3)[NEG]
+                    4         ;; reg == {4} --> (br 4)[MUL]
+                    5         ;; reg == {5} --> (br 5)[IMUL]
+                    6         ;; reg == {6} --> (br 6)[DIV]
+                    7         ;; 0 > reg OR reg >= 7 --> (br 7 (Default))[IDIV]
+                  ))
+                  ;; Target for (br 0)
+                  (block
+                    (drop
+                      (call $set_zsp
+                        (local.get $mode)
+                        (i32.and
+                          (local.get $destination)
+                          (select
+                            (block (result i32)
+                              (call $ram.get16 (call $register.segment.get (global.get $CS)) (global.get $IP))
+                              (call $step_ip (i32.const 2))
+                            )
+                            (block (result i32)
+                              (call $ram.get8 (call $register.segment.get (global.get $CS)) (global.get $IP))
+                              (call $step_ip (i32.const 1))
+                            ) 
+                            (local.get $mode))
+                        )
+                      )
+                    )
+
+                    return
+                  ))
+                ;; Target for (br 1)
+                (block
+                  return
+                ))
+              ;; Target for (br 2)
+              (block
+                (local.set $temp
+                  (i32.and
+                    (i32.xor (local.get $destination) (i32.const -1))
+                    (select (i32.const 65535) (i32.const 255) 
+                            (local.get $mode))
+                  )
+                )
+                (if (i32.eqz (local.get $mode))
+                  (then ;; 8-Bit
+                    (call $logical_write8 (local.get $temp))
+                  )
+                  (else ;; 16-Bit
+                    (call $logical_write16 (local.get $temp))
+                  )
+                )
+
+                return
+              ))
+            ;; Target for (br 3)
+            (block
+              (local.set $temp
+                (call $i32.neg (local.get $destination))
+              )
+              (if (i32.eqz (local.get $mode))
+                (then ;; 8-Bit
+                  (call $logical_write8 (local.get $temp))
+                )
+                (else ;; 16-Bit
+                  (call $logical_write16 (local.get $temp))
+                )
+              )
+
+              return
+            ))
+          ;; Target for (br 4)
+          (block
+            (if (i32.eqz (local.get $mode))
+              (then ;; 8-Bit
+                (call $register.general.set8
+                  (global.get $AX)
+                  (call $set_zsp
+                    (i32.const 0)
+                    (i32.mul
+                      (call $register.general.get8 (global.get $AL))
+                      (local.get $destination)
+                    )
+                  )
+                )
+              )
+              (else ;; 16-Bit
+                (local.set $temp
+                  (call $set_zsp
+                    (i32.const 1)
+                    (i32.mul
+                      (call $register.general.get16 (global.get $AX))
+                      (local.get $destination)
+                    )
+                  )
+                )
+
+                (call $register.general.set8
+                  (global.get $AX)
+                  (i32.and
+                    (local.get $temp)
+                    (i32.const 65535)
+                  )
+                )
+                (call $register.general.set8
+                  (global.get $DX)
+                  (i32.shr_u
+                    (local.get $temp)
+                    (i32.const 16)
+                  )
+                )
+              )
+            )
+
+            (local.set $temp 
+              (select (call $register.general.get16 (global.get $DX)) (call $register.general.get8 (global.get $AH))
+                      (local.get $mode))
+            )
+            (call $register.flag.set
+              (global.get $CF)
+              (local.get $temp)
+            )
+            (call $register.flag.set
+              (global.get $OF)
+              (local.get $temp)
+            )
+
+            return
+          ))
+        ;; Target for (br 5)
+        (block
+          (if (i32.eqz (local.get $mode))
+            (then ;; 8-Bit
+              (call $register.general.set8
+                (global.get $AX)
+                (call $set_zsp
+                  (i32.const 0)
+                  (i32.mul
+                    (call $register.general.get8 (global.get $AL))
+                    (local.get $destination)
+                  )
+                )
+              )
+            )
+            (else ;; 16-Bit
+              (local.set $temp
+                (call $set_zsp
+                  (i32.const 1)
+                  (i32.mul
+                    (call $register.general.get16 (global.get $AX))
+                    (local.get $destination)
+                  )
+                )
+              )
+
+              (call $register.general.set16
+                (global.get $AX)
+                (i32.and
+                  (local.get $temp)
+                  (i32.const 65535)
+                )
+              )
+              (call $register.general.set16
+                (global.get $DX)
+                (i32.shr_u
+                  (local.get $temp)
+                  (i32.const 16)
+                )
+              )
+            )
+          )
+
+          (local.set $temp 
+            (select (call $register.general.get16 (global.get $DX)) (call $register.general.get8 (global.get $AH))
+                    (local.get $mode))
+          )
+          (call $register.flag.set
+            (global.get $CF)
+            (local.get $temp)
+          )
+          (call $register.flag.set
+            (global.get $OF)
+            (local.get $temp)
+          )
+
+          return
+        ))
+      ;; Target for (br 6)
+      (block
+        (if (i32.eqz (local.get $mode))
+          (then ;; 8-Bit
+            (call $register.general.set8
+              (global.get $AX)
+              (call $set_zsp
+                (i32.const 0)
+                (i32.div_u
+                  (call $register.general.get8 (global.get $AL))
+                  (local.get $destination)
+                )
+              )
+            )
+          )
+          (else ;; 16-Bit
+            (local.set $temp
+              (call $set_zsp
+                (i32.const 1)
+                (i32.div_u
+                  (call $register.general.get16 (global.get $AX))
+                  (local.get $destination)
+                )
+              )
+            )
+
+            (call $register.general.set16
+              (global.get $AX)
+              (i32.and
+                (local.get $temp)
+                (i32.const 65535)
+              )
+            )
+            (call $register.general.set16
+              (global.get $DX)
+              (i32.shr_u
+                (local.get $temp)
+                (i32.const 16)
+              )
+            )
+          )
+        )
+
+        return
+      ))
+    ;; (Default) Target for (br 7)
+    (block
+      (if (i32.eqz (local.get $mode))
+        (then ;; 8-Bit
+          (call $register.general.set8
+            (global.get $AX)
+            (call $set_zsp
+              (i32.const 0)
+              (i32.div_s
+                (i32.shr_s
+                  (i32.shl (call $register.general.get8 (global.get $AL)) (i32.const 24))
+                  (i32.const 24)
+                )
+                (i32.shr_s
+                  (i32.shl (local.get $destination) (i32.const 24))
+                  (i32.const 24)
+                )
+              )
+            )
+          )
+        )
+        (else ;; 16-Bit
+          (local.set $temp
+            (call $set_zsp
+              (i32.const 1)
+              (i32.div_s
+                (i32.shr_s
+                  (i32.shl (call $register.general.get16 (global.get $AX)) (i32.const 16))
+                  (i32.const 16)
+                )
+                (i32.shr_s
+                  (i32.shl (local.get $destination) (i32.const 16))
+                  (i32.const 16)
+                )
+              )
+            )
+          )
+
+          (call $register.general.set16
+            (global.get $AX)
+            (i32.and
+              (local.get $temp)
+              (i32.const 65535)
+            )
+          )
+          (call $register.general.set16
+            (global.get $DX)
+            (i32.shr_u
+              (local.get $temp)
+              (i32.const 16)
+            )
+          )
+        )
+      )
+
+      return
+    )
+  )
+
 
   (; Undocumented or duplicate OpCodes ;)
   ;; Most illegal OpCodes would just map to other documented instructions (e.g., 0x60 - 0x6f --> 0x70 – 0x7f);
@@ -4070,13 +5018,17 @@
     (call $0xcb)
   )
 
-  ;; this OpCode sets AL to 256 if the carry flag is set; 0 otherwise.
+  ;; this OpCode sets AL to 255 if the carry flag is set; 0 otherwise.
   (func $0xd6 (; SALC ;)
     (call $register.general.set8 
       (global.get $AL)
       (select (i32.const 0xff) (i32.const 0x00)
               (call $register.flag.get (global.get $CF)))
     )
+  )
+
+  (func $0xf1 (; equivalent: f0h ;)
+    (call $0xf0)
   )
 
 
