@@ -204,16 +204,16 @@
             // variable rather than making separate 'halt' or 'continue' flag.
             document.getElementById('run').addEventListener('click', function() {
               instance.exports.programLength.value = opcodes.length;
-              instance.exports.execute();
+              instance.exports.run();
             }, false);
             document.getElementById('step').addEventListener('click', function() {
               const temp = instance.exports.IP.value + 1;
               instance.exports.programLength.value = (temp > opcodes.length) ? opcodes.length : temp;
-              instance.exports.execute();
+              instance.exports.run();
             }, false);
             document.getElementById('stop').addEventListener('click', function() {
               instance.exports.programLength.value = instance.exports.IP.value;
-              instance.exports.execute(instance.exports.IP.value);
+              instance.exports.run(instance.exports.IP.value);
             }, false);
           }
           
