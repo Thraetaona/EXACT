@@ -45,10 +45,10 @@ The emulator has been thoroughly documented, except in places where doing so wou
 
 | Emulation Capability | Current Status |
 | :--- | ---: |
-| Instructions <sup>1</sup> | All, including illegal OpCodes |
+| Instructions<sup>1</sup> | All, including illegal OpCodes |
 | Registers | Both User-accessible registers and Reserved Flags are available |
 | RAM | Supports up to 2^20 unique segmentated addresses with 16/8 Bit interfaces for interactions |
-| Multimedia (GPU, sound, etc) <sup>2</sup> | - |
+| Multimedia (GPU, sound, etc)<sup>2</sup> | - |
 
 ---
 
