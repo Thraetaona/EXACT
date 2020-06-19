@@ -138,9 +138,11 @@
         // be used to create 'instances' of this emulator, each instance has its own isolated memory along with global variable scope.
         const module = await WebAssembly.compileStreaming(fetch('./8086.wasm'));
 
+        let updateUI;
+
         document.getElementById('examples').addEventListener('change', async function(example) {
           // Clears the UI updater (if any)
-          window.clearInterval();
+          clearInterval(updateUI)
 
           // Each time a new file is uploaded, we will create an 'instance' of this emulator for it,
           // the instance will be dedicated to running the said program.
@@ -150,37 +152,8 @@
           // allocating memory on the heap every time updateUI is run,
           // so we allocate it once in here, and simply pass it to the UI updater.
           const byteBuffer = new Uint8Array(instance.exports.memory.buffer),
-                wordBuffer = new Uint16Array(instance.exports.memory.buffer);
-
-          window.setInterval(async function() {
-            const registers = document.getElementsByClassName("register");
-            
-            for (let offset = 0; offset < 8; offset++) {
-                // 16-Bit General-purpose and Index registers
-                registers[offset].innerHTML = wordBuffer[offset];
-                // 8-Bit register decodes
-                registers[offset + 8].innerHTML = byteBuffer[offset];
-            }
-
-            for (let offset = 8; offset < 12; offset++) {
-                // Segment registers
-                registers[offset + 8].innerHTML = wordBuffer[offset];
-            }
-
-            // Flag registers do not follow a uniform order, hence the manual assignment.
-            registers[20].innerHTML = byteBuffer[24];
-            registers[21].innerHTML = byteBuffer[26];
-            registers[22].innerHTML = byteBuffer[28];
-            registers[23].innerHTML = byteBuffer[30];
-            registers[24].innerHTML = byteBuffer[31];
-            registers[25].innerHTML = byteBuffer[32];
-            registers[26].innerHTML = byteBuffer[33];
-            registers[27].innerHTML = byteBuffer[34];
-            registers[28].innerHTML = byteBuffer[35];
-
-            // Program counter
-            registers[29].innerHTML = instance.exports.IP.value;
-          }, 15);
+                wordBuffer = new Uint16Array(instance.exports.memory.buffer),
+                registers = document.getElementsByClassName("register");
           
           let file = await fetch('examples/' + example.target.value);
           let buffer = await file.arrayBuffer();
@@ -207,33 +180,15 @@
           }, false);
           document.getElementById('step').addEventListener('click', function() {
             const temp = instance.exports.IP.value + 1;
-            instance.exports.programLength.value = (temp > opcodes.byteLength) ? opcodes.byteLength: temp;
+            instance.exports.programLength.value = (temp > opcodes.byteLength) ? opcodes.byteLength : temp;
             instance.exports.run();
           }, false);
           document.getElementById('stop').addEventListener('click', function() {
             instance.exports.programLength.value = instance.exports.IP.value;
-            instance.exports.run(instance.exports.IP.value);
+            instance.exports.run();
           }, false);
-        }, false);
 
-        document.getElementById('upload').addEventListener('change', async function(uploaded) {
-
-          // Clears the UI updater (if any)
-          window.clearInterval();
-
-          // Each time a new file is uploaded, we will create an 'instance' of this emulator for it,
-          // the instance will be dedicated to running the said program.
-          const instance = await WebAssembly.instantiate(module, imports);
-
-          // Since the UI runs at 60 frames per second we should not be
-          // allocating memory on the heap every time updateUI is run,
-          // so we allocate it once in here, and simply pass it to the UI updater.
-          const byteBuffer = new Uint8Array(instance.exports.memory.buffer),
-                wordBuffer = new Uint16Array(instance.exports.memory.buffer);
-
-          window.setInterval(async function() {
-            const registers = document.getElementsByClassName("register");
-            
+          updateUI = window.setInterval(async function() {
             for (let offset = 0; offset < 8; offset++) {
                 // 16-Bit General-purpose and Index registers
                 registers[offset].innerHTML = wordBuffer[offset];
@@ -259,8 +214,25 @@
 
             // Program counter
             registers[29].innerHTML = instance.exports.IP.value;
-          }, 15);
+          }, 15);          
+        }, false);
 
+        document.getElementById('upload').addEventListener('change', async function(uploaded) {
+
+          // Clears the UI updater (if any)
+          clearInterval(updateUI)
+
+          // Each time a new file is uploaded, we will create an 'instance' of this emulator for it,
+          // the instance will be dedicated to running the said program.
+          const instance = await WebAssembly.instantiate(module, imports);
+
+          // Since the UI runs at 60 frames per second we should not be
+          // allocating memory on the heap every time updateUI is run,
+          // so we allocate it once in here, and simply pass it to the UI updater.
+          const byteBuffer = new Uint8Array(instance.exports.memory.buffer),
+                wordBuffer = new Uint16Array(instance.exports.memory.buffer),
+                registers = document.getElementsByClassName("register");
+                
           let file = uploaded.target.files[0];
           let reader = new FileReader();
 
@@ -291,11 +263,39 @@
             }, false);
             document.getElementById('stop').addEventListener('click', function() {
               instance.exports.programLength.value = instance.exports.IP.value;
-              instance.exports.run(instance.exports.IP.value);
+              instance.exports.run();
             }, false);
           }
           
           reader.readAsArrayBuffer(file);
+
+          updateUI = window.setInterval(async function() {
+            for (let offset = 0; offset < 8; offset++) {
+                // 16-Bit General-purpose and Index registers
+                registers[offset].innerHTML = wordBuffer[offset];
+                // 8-Bit register decodes
+                registers[offset + 8].innerHTML = byteBuffer[offset];
+            }
+
+            for (let offset = 8; offset < 12; offset++) {
+                // Segment registers
+                registers[offset + 8].innerHTML = wordBuffer[offset];
+            }
+
+            // Flag registers do not follow a uniform order, hence the manual assignment.
+            registers[20].innerHTML = byteBuffer[24];
+            registers[21].innerHTML = byteBuffer[26];
+            registers[22].innerHTML = byteBuffer[28];
+            registers[23].innerHTML = byteBuffer[30];
+            registers[24].innerHTML = byteBuffer[31];
+            registers[25].innerHTML = byteBuffer[32];
+            registers[26].innerHTML = byteBuffer[33];
+            registers[27].innerHTML = byteBuffer[34];
+            registers[28].innerHTML = byteBuffer[35];
+
+            // Program counter
+            registers[29].innerHTML = instance.exports.IP.value;
+          }, 15);
         }, false);
       })();
     </script>
@@ -373,5 +373,7 @@
       <section id="memory">
       </section>
     </section>
+
+    Source Available at <a href="https://github.com/VioletVillain/EXACT">GitHub</a>
   </body>
 </html>
