@@ -5,7 +5,7 @@
   <img src="" alt="Logo">
 
   <p>
-    <strong><b>E</b>mulating <b>X</b>86 i<b>A</b>PX <b>C</b>PU on Ne<b>T</b></strong>
+    <strong>A Bare-Metal Intel iAPX 86/10 Emulator Written In Pure WebAssembly.</strong>
   </p>
 
   <p>
