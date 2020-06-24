@@ -13,7 +13,7 @@
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
     <meta name="title" content="EXACT">
     <meta name="author" content="Fereydoun Memarzanjany">
-    <meta name="description" content="Bare-metal Intel iAPX 86/10 Emulator Written In Pure WebAssembly.">
+    <meta name="description" content="Bare-metal Intel iAPX 86/10 Emulator Written In Raw WebAssembly.">
     <meta name="keywords" content="intel, 8086, iapx, emulator, webassembly, wasm, wat, wast, assembly, browser, cpu, cpu-emulator, 16bit, emulation, graphical, x86, 8086-emulator, 8086-architecture">
     <style>
       /* 
@@ -38,6 +38,9 @@
       }
 
 
+      /* I Avoid using external dependencies but this is required considering how web browsers    *
+       * either don't have the same built-in fonts or override and replace those with custom ones */
+      @import url(//fonts.googleapis.com/css?family=Noto+Sans);
 
       /* 
       * Custom styles for elements 
@@ -50,7 +53,7 @@
       }
 
       code {
-        font-family: lucida console !important; /* First impression is important, some browsers try to override the default font (monocode) for <code> tags */
+        font-family: 'Noto Sans', monospace !important; /* First impression is important, some browsers try to override the default font (monocode) for <code> tags */
       }
 
       p {
@@ -138,9 +141,18 @@
         // be used to create 'instances' of this emulator, each instance has its own isolated memory along with global variable scope.
         const module = await WebAssembly.compileStreaming(fetch('./8086.wasm'));
 
+        // The UI updater's handle, as ianonymous intervals can not be cleared.
         let updateUI;
 
-        document.getElementById('examples').addEventListener('change', async function(example) {
+        document.getElementById('examples').addEventListener('change', e => { init(e, 1); }, false);
+        document.getElementById('upload').addEventListener('change', e => { init(e, 0); }, false);
+
+        
+        // The front-end currently allows uploading a local (residing in the same directory as this file) or remote (from the users PC).
+        // It would be much better if it also supported 'live' examples, such as embedding an assembler (like NASM) inside of the webpage
+        // which allows users to write assembly code and see it's run-time results at the same time.
+        async function init(uploaded, local) {
+
           // Clears the UI updater (if any)
           clearInterval(updateUI)
 
@@ -154,94 +166,17 @@
           const byteBuffer = new Uint8Array(instance.exports.memory.buffer),
                 wordBuffer = new Uint16Array(instance.exports.memory.buffer),
                 registers = document.getElementsByClassName("register");
-          
-          let file = await fetch('examples/' + example.target.value);
-          let buffer = await file.arrayBuffer();
 
-          const opcodes = new DataView(buffer, 0, buffer.byteLength);
+          if (local) {
+            const file = await fetch('examples/' + uploaded.target.value);
+            const buffer = await file.arrayBuffer();
 
-          instance.exports.programLength.value = opcodes.byteLength;
+            const opcodes = new DataView(buffer, 0, buffer.byteLength);
 
-          for (let offset = 0; offset < instance.exports.programLength.value; offset++) {
-            byteBuffer[offset + 40] = opcodes.getUint8(offset);
-          }
-
-          if (instance.exports.programLength.value > 0) {
-            for (let offset = 0; offset < 3; offset++) {
-              document.getElementById("control").children[offset].disabled = false;
-            }
-          }
-
-          // Simply modifying programLength's value allows us to re-use this existing
-          // variable rather than making separate 'halt' or 'continue' flag.
-          document.getElementById('run').addEventListener('click', function() {
             instance.exports.programLength.value = opcodes.byteLength;
-            instance.exports.run();
-          }, false);
-          document.getElementById('step').addEventListener('click', function() {
-            const temp = instance.exports.IP.value + 1;
-            instance.exports.programLength.value = (temp > opcodes.byteLength) ? opcodes.byteLength : temp;
-            instance.exports.run();
-          }, false);
-          document.getElementById('stop').addEventListener('click', function() {
-            instance.exports.programLength.value = instance.exports.IP.value;
-            instance.exports.run();
-          }, false);
-
-          updateUI = window.setInterval(async function() {
-            for (let offset = 0; offset < 8; offset++) {
-                // 16-Bit General-purpose and Index registers
-                registers[offset].innerHTML = wordBuffer[offset];
-                // 8-Bit register decodes
-                registers[offset + 8].innerHTML = byteBuffer[offset];
-            }
-
-            for (let offset = 8; offset < 12; offset++) {
-                // Segment registers
-                registers[offset + 8].innerHTML = wordBuffer[offset];
-            }
-
-            // Flag registers do not follow a uniform order, hence the manual assignment.
-            registers[20].innerHTML = byteBuffer[24];
-            registers[21].innerHTML = byteBuffer[26];
-            registers[22].innerHTML = byteBuffer[28];
-            registers[23].innerHTML = byteBuffer[30];
-            registers[24].innerHTML = byteBuffer[31];
-            registers[25].innerHTML = byteBuffer[32];
-            registers[26].innerHTML = byteBuffer[33];
-            registers[27].innerHTML = byteBuffer[34];
-            registers[28].innerHTML = byteBuffer[35];
-
-            // Program counter
-            registers[29].innerHTML = instance.exports.IP.value;
-          }, 15);          
-        }, false);
-
-        document.getElementById('upload').addEventListener('change', async function(uploaded) {
-
-          // Clears the UI updater (if any)
-          clearInterval(updateUI)
-
-          // Each time a new file is uploaded, we will create an 'instance' of this emulator for it,
-          // the instance will be dedicated to running the said program.
-          const instance = await WebAssembly.instantiate(module, imports);
-
-          // Since the UI runs at 60 frames per second we should not be
-          // allocating memory on the heap every time updateUI is run,
-          // so we allocate it once in here, and simply pass it to the UI updater.
-          const byteBuffer = new Uint8Array(instance.exports.memory.buffer),
-                wordBuffer = new Uint16Array(instance.exports.memory.buffer),
-                registers = document.getElementsByClassName("register");
-                
-          let file = uploaded.target.files[0];
-          let reader = new FileReader();
-
-          reader.onload = function() {
-            let opcodes = new Uint8Array(reader.result);   
-            instance.exports.programLength.value = opcodes.length;
 
             for (let offset = 0; offset < instance.exports.programLength.value; offset++) {
-              byteBuffer[offset + 40] = opcodes[offset];
+              byteBuffer[offset + 40] = opcodes.getUint8(offset);
             }
 
             if (instance.exports.programLength.value > 0) {
@@ -253,12 +188,12 @@
             // Simply modifying programLength's value allows us to re-use this existing
             // variable rather than making separate 'halt' or 'continue' flag.
             document.getElementById('run').addEventListener('click', function() {
-              instance.exports.programLength.value = opcodes.length;
+              instance.exports.programLength.value = opcodes.byteLength;
               instance.exports.run();
             }, false);
             document.getElementById('step').addEventListener('click', function() {
               const temp = instance.exports.IP.value + 1;
-              instance.exports.programLength.value = (temp > opcodes.length) ? opcodes.length : temp;
+              instance.exports.programLength.value = (temp > opcodes.byteLength) ? opcodes.byteLength : temp;
               instance.exports.run();
             }, false);
             document.getElementById('stop').addEventListener('click', function() {
@@ -266,8 +201,43 @@
               instance.exports.run();
             }, false);
           }
-          
-          reader.readAsArrayBuffer(file);
+          else {
+              const file = uploaded.target.files[0];
+              const reader = new FileReader();
+
+              reader.onload = function() {
+                let opcodes = new Uint8Array(reader.result);   
+                instance.exports.programLength.value = opcodes.length;
+
+                for (let offset = 0; offset < instance.exports.programLength.value; offset++) {
+                  byteBuffer[offset + 40] = opcodes[offset];
+                }
+
+                if (instance.exports.programLength.value > 0) {
+                  for (let offset = 0; offset < 3; offset++) {
+                    document.getElementById("control").children[offset].disabled = false;
+                  }
+                }
+
+                // Simply modifying programLength's value allows us to re-use this existing
+                // variable rather than making separate 'halt' or 'continue' flag.
+                document.getElementById('run').addEventListener('click', function() {
+                  instance.exports.programLength.value = opcodes.length;
+                  instance.exports.run();
+                }, false);
+                document.getElementById('step').addEventListener('click', function() {
+                  const temp = instance.exports.IP.value + 1;
+                  instance.exports.programLength.value = (temp > opcodes.length) ? opcodes.length : temp;
+                  instance.exports.run();
+                }, false);
+                document.getElementById('stop').addEventListener('click', function() {
+                  instance.exports.programLength.value = instance.exports.IP.value;
+                  instance.exports.run();
+                }, false);
+            }
+            
+            reader.readAsArrayBuffer(file);
+          }
 
           updateUI = window.setInterval(async function() {
             for (let offset = 0; offset < 8; offset++) {
@@ -296,7 +266,7 @@
             // Program counter
             registers[29].innerHTML = instance.exports.IP.value;
           }, 15);
-        }, false);
+        }
       })();
     </script>
   </head>

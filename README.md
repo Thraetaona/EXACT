@@ -5,7 +5,7 @@
   <img src="" alt="Logo">
 
   <p>
-    <strong>A Bare-Metal Intel iAPX 86/10 Emulator Written In Pure WebAssembly.</strong>
+    <strong>A Bare-Metal Intel iAPX 86/10 Emulator Written In Raw WebAssembly.</strong>
   </p>
 
   <p>
@@ -35,7 +35,7 @@ This project was primarily done for two reasons:
 * *In favor of [RASM](https://github.com/VioletVillain/RASM)*, which is basically a work-in-progress Game Engine written in Rust.  Getting fluent in WebAssembly meant writing efficient code and eased its debugging.
 * *Experience*.  an in-depth study of processor that still has alot in common with x86_64 will surely assist in writing optimized code; even though the 8086 lacked any concepts of caches (as an example).
 
-The emulator has been thoroughly documented, except in places where doing so would have been considered extremely verbose or obivous.
+The emulator has been thoroughly documented, except in places where doing so would have been considered extremely verbose or otherwise obivous.
 
 
 ***
