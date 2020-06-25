@@ -526,7 +526,7 @@
 
   ;; Stores a 16-Bit value in a given logical address.
   (func $ram.write16 (param $address i32) (param $offset i32) (param $value i32)
-    (i32.store16 offset=40
+    (call $ram.direct_write16
       (call $ram.decode (local.get $address) (local.get $offset))
       (local.get $value)
     )
@@ -534,14 +534,14 @@
   ;; Retrieves a 16-Bit value from the specified logical address.
   (func $ram.read16 (param $address i32) (param $offset i32)
                     (result i32)
-    (i32.load16_u offset=40
+    (call $ram.direct_read16
       (call $ram.decode (local.get $address) (local.get $offset))
     )
   )
 
   ;; Stores a 8-Bit value in a given logical address.
   (func $ram.write8 (param $address i32) (param $offset i32) (param $value i32)
-    (i32.store8 offset=40
+    (call $ram.direct_write8
       (call $ram.decode (local.get $address) (local.get $offset))
       (local.get $value)
     )
@@ -549,7 +549,7 @@
   ;; Retrieves a 8-Bit value from the specified logical address.
   (func $ram.read8 (param $address i32) (param $offset i32)
                    (result i32)
-    (i32.load8_u offset=40
+    (call $ram.direct_read8
       (call $ram.decode (local.get $address) (local.get $offset))
     )
   )
@@ -686,7 +686,7 @@
               0 ;; mod == {000b} --> (br 0)[R/M table 1 with R/M operand]
               1 ;; mod == {001b} --> (br 1)[R/M table 2 with 8-Bit displacement]
               2 ;; mod == {010b} --> (br 2)[R/M table 3 with 16-Bit displacement]
-              3 ;; 000b > mod OR mod >= 3 --> (br 3 (Default))[REG table]
+              3 ;; 000b > mod OR mod >= 011b --> (br 3 (Default))[REG table]
             ))
           ;; Mod target for (br 0)
             (; R/M table 1 with R/M operand ;)
@@ -2872,7 +2872,7 @@
     
     (call $GRP1/16
       (call $logical_read16)
-      (call $i16.extend8_s ;; This opcode accepts both a byte AND a word as it's operands, so the byte has to be sign-extended.
+      (call $i16.extend8_s ;; This OpCode accepts both a byte AND a word as it's operands, so the byte has to be sign-extended.
         (block (result i32)
           (call $ram.read16 (call $register.segment.get (global.get $CS)) (global.get $IP))
           (call $step_ip (i32.const 2))

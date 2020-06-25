@@ -2,6 +2,7 @@
 
 cpu 8086
 
+
 mov cx, 1024
 push cx
 pop ds
