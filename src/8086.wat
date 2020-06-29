@@ -106,7 +106,7 @@
   ;; Be aware that even a few extra _Bytes_ could be saved by using a segmented module along with offsets or branching;
   ;; However, that would significantly lower performance and complicate the codebase with no Reasonable gains.
   ;; Linear memory layout:
-  ;; (numbers represents bytes and each WASM memory page equqls 64KiB.)
+  ;; (numbers represents bytes and each WASM memory page equals 64KiB.)
   ;;
   ;; [0, 7]         => General registers.
   ;; (7, 15]        => Index registers.
