@@ -18,6 +18,10 @@
 ;; Basic module-level Overview resides in the 'README.md' file.
 ;;
 ;; Assemble with 'wat2wasm ./src/8086.wat -o ./src/8086.wasm'
+;; The resulting bytecode could optionally be further optimized using
+;; 'wasm-opt -O4 --enable-mutable-globals --flatten -iit --dfo --directize --precompute ./src/8086.wasm -o ./src/8086.wasm'
+;;
+;; The above steps could be done using 'wasm-as'; however, it currently does not support the S-expression format.
 
 
 
@@ -42,6 +46,7 @@
 ;;
 ;; The old WebAssembly documentation explains the purpose of each instruction:
 ;; https://webassembly.github.io/spec/core/syntax/instructions.html
+;; https://developer.mozilla.org/en-US/docs/WebAssembly/Understanding_the_text_format
 ;;
 ;; For information about how numbers and values are encoded in WebAssembly:
 ;; https://webassembly.github.io/spec/core/binary/values.html
