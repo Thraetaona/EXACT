@@ -1,4 +1,4 @@
- ; Assemble with "nasm -O0 -f bin checked_add.asm"
+ ; Assemble with "nasm -O0 -f bin jump.asm"
 
 cpu 8086
 
