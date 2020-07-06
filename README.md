@@ -5,7 +5,7 @@
   <img src="" alt="Logo">
 
   <p>
-    <strong>A Bare-Metal Intel iAPX 86/10 Emulator Written In Raw WebAssembly.</strong>
+    <strong>A Bare-Metal Intel 8086 Emulator Written In Raw WebAssembly.</strong>
   </p>
 
   <p>
