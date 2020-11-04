@@ -9,19 +9,19 @@
   </p>
 
   <p>
-    <a href="https://github.com/VioletVillain/EXACT/actions"><img alt="GitHub Actions CI status" src="https://github.com/VioletVillain/EXACT/workflows/EXACT/badge.svg"></a>
+    <a href="https://github.com/Thraetaona/EXACT/actions"><img alt="GitHub Actions CI status" src="https://github.com/Thraetaona/EXACT/workflows/EXACT/badge.svg"></a>
   </p>
 
   <h3>
-    <a href="https://VioletVillain.github.io/EXACT/">Website</a>
+    <a href="https://Thraetaona.github.io/EXACT/">Website</a>
     <span> | </span>
-    <a href="https://github.com/VioletVillain/EXACT/issues">Issue Tracker</a>
+    <a href="https://github.com/Thraetaona/EXACT/issues">Issue Tracker</a>
     <span> | </span>
-    <a href="https://github.com/VioletVillain/EXACT/actions">CI</a>
+    <a href="https://github.com/Thraetaona/EXACT/actions">CI</a>
     <span> | </span>
-    <a href="https://github.com/VioletVillain/EXACT/projects">Roadmap</a>
+    <a href="https://github.com/Thraetaona/EXACT/projects">Roadmap</a>
     <span> | </span>
-    <a href="https://github.com/VioletVillain/EXACT/releases">Releases</a>
+    <a href="https://github.com/Thraetaona/EXACT/releases">Releases</a>
   </h3>
   
 </div>
@@ -29,10 +29,11 @@
 ***
 
 ## Abstract
-EXACT is an acronym for '**E**mulating **X**86 i**A**PX **C**PU on Ne**T**'.
+EXACT is an acronym for '**E**mulating **X**86 i**A**PX **C**PU on Ne**T**'. \
+[Live demo with examples deployed at GitHub Pages.](https://Thraetaona.github.io/EXACT)
 
 This project was primarily done for two reasons:
-* *In favor of [RASM](https://github.com/VioletVillain/RASM)*, which is basically a work-in-progress Game Engine written in Rust.  Getting fluent in WebAssembly meant writing efficient code and eased its debugging.
+* *In favor of [RASM](https://github.com/Thraetaona/RASM)*, which is basically a work-in-progress Game Engine written in Rust.  Getting fluent in WebAssembly meant writing efficient code and eased its debugging.
 * *Experience*.  an in-depth study of processor that still has alot in common with x86_64 will surely assist in writing optimized code; even though the 8086 lacked any concepts of caches (as an example).
 
 The emulator has been thoroughly documented, except in places where doing so would have been considered extremely verbose or otherwise obivous.
