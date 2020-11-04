@@ -30,7 +30,7 @@
 
 ## Abstract
 EXACT is an acronym for '**E**mulating **X**86 i**A**PX **C**PU on Ne**T**'. \
-[Live demo with examples deployed at GitHub Pages.](https://Thraetaona.github.io/EXACT)
+[Working demonstration with examples deployed at GitHub Pages.](https://Thraetaona.github.io/EXACT)
 
 This project was primarily done for two reasons:
 * *In favor of [RASM](https://github.com/Thraetaona/RASM)*, which is basically a work-in-progress Game Engine written in Rust.  Getting fluent in WebAssembly meant writing efficient code and eased its debugging.
