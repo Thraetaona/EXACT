@@ -2,18 +2,12 @@
 
   <h1><code>EXACT</code></h1>
 
-  <img src="" alt="Logo">
-
   <p>
     <strong>A Bare-Metal Intel 8086 Emulator Written In Raw WebAssembly.</strong>
   </p>
 
-  <p>
-    <a href="https://github.com/Thraetaona/EXACT/actions"><img alt="GitHub Actions CI status" src="https://github.com/Thraetaona/EXACT/workflows/EXACT/badge.svg"></a>
-  </p>
-
   <h3>
-    <a href="https://Thraetaona.github.io/EXACT/">Website</a>
+    <a href="https://Thraetaona.github.io/EXACT/">Demo</a>
     <span> | </span>
     <a href="https://github.com/Thraetaona/EXACT/issues">Issue Tracker</a>
     <span> | </span>
@@ -39,8 +33,9 @@ This project was primarily done for two reasons:
 The emulator's source code has been thoroughly documented, except in places where doing so would have been considered extremely verbose or otherwise obivous.
 
 ## How To Compile And Run
-The easiest way to get EXACT up-and-running is by downloading the latest pre-built binaries from the [releases section](https://github.com/Thraetaona/EXACT/releases), unpacking the .zip file, running the python script with and lastly visiting http://localhost:8086/
+The easiest way to get EXACT up-and-running is by downloading the latest pre-built binaries from the [releases section](https://github.com/Thraetaona/EXACT/releases), unpacking the .zip file, running the Python script (serve.py) and lastly visiting http://localhost:8086/ using an updated browser that supports WeAssembly.
 
+---
 
 Alternatively you could follow the below instructions for a manual build:
 
@@ -64,7 +59,7 @@ The resulting bytecode could optionally be further optimized using: <br>
 And finally host the compiled binary along with the HTML file (./src/index.html) at a local or live webserver with **application/wasm** mimetype; and visit it using a browser supporting the base WebAssembly standard (And the exported mutable globals porposal), such as Google Chrome, Mozilla FireFox or the Chromium-based Microsoft Edge.
 
 <sub>
-You could also add your own or just assemble all the included source files in the ./examples folder using the Netwide Assembler ("NASM") with ```for f in ./examples/*.asm; do nasm -O0 -f bin "$f";done```, if you also host these binary files alongside the previous files, they will appear under the "Examples" dropdown menu in GUI.
+You could also add your own or just assemble all the included source files in the ./examples folder using the Netwide Assembler ("NASM") with ```for f in ./examples/*.asm; do nasm -O0 -f bin "$f";done```, if you also host these binary files alongside the previous files, they will appear under the "Examples" dropdown menu in the GUI.
 </sub>
  
 ***
