@@ -61,7 +61,7 @@ The resulting bytecode could optionally be further optimized using: <br>
 And finally host the compiled binary along with the HTML file (./src/index.html) at a local or live webserver with **application/wasm** mimetype; and visit it using a browser supporting the base WebAssembly standard (And the exported mutable globals porposal), such as Google Chrome, Mozilla FireFox or the Chromium-based Microsoft Edge.
 
 <sub>
-You could also add your own or just assemble all the included source files in the ./examples folder using the Netwide Assembler ("NASM") with ```for f in ./examples/*.asm; do nasm -O0 -f bin "$f";done```, if you also host these binary files alongside the previous files, they will appear under the "Examples" dropdown menu in the GUI.
+You could also add your own or just assemble all the included source files in the ./examples folder using the Netwide Assembler ("NASM") with <code>for f in ./examples/*.asm; do nasm -O0 -f bin "$f";done</code>, if you also host these binary files alongside the previous files, they will appear under the "Examples" dropdown menu in the GUI.
 </sub>
  
 ***
