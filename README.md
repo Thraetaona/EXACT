@@ -36,16 +36,44 @@ This project was primarily done for two reasons:
 * *In favor of [RASM](https://github.com/Thraetaona/RASM)*, which is basically a work-in-progress Game Engine written in Rust.  Getting fluent in WebAssembly meant writing efficient code and eased its debugging.
 * *Experience*.  an in-depth study of processor that still has alot in common with x86_64 will surely assist in writing optimized code; even though the 8086 lacked any concepts of caches (as an example).
 
-The emulator has been thoroughly documented, except in places where doing so would have been considered extremely verbose or otherwise obivous.
+The emulator's source code has been thoroughly documented, except in places where doing so would have been considered extremely verbose or otherwise obivous.
+
+## How To Compile And Run
+The easiest way to get EXACT up-and-running is by downloading the latest pre-built binaries from the [releases section](https://github.com/Thraetaona/EXACT/releases), unpacking the .zip file, running the python script with and lastly visiting http://localhost:8086/
 
 
+Alternatively you could follow the below instructions for a manual build:
+
+First install the official WebAssembly Binary Toolkit ("WABT") using your package manager or from [their GitHub Repository](https://github.com/WebAssembly/wabt).
+
+Next, Assemble the source code with: 
+```
+wat2wasm ./src/8086.wat -o ./src/8086.wasm
+```
+
+<sub>
+The resulting bytecode could optionally be further optimized using: <br>
+  <code>
+    wasm-opt -O4 --enable-mutable-globals --flatten -iit --dfo --directize --precompute ./src/8086.wasm -o ./src/8086.wasm
+  </code>
+  <br>
+(But be aware that aggressive optimizations could result in inaccuracies or unexpected bugs and side effects.) <br>
+</sub>
+<br>
+
+And finally host the compiled binary along with the HTML file (./src/index.html) at a local or live webserver with **application/wasm** mimetype; and visit it using a browser supporting the base WebAssembly standard (And the exported mutable globals porposal), such as Google Chrome, Mozilla FireFox or the Chromium-based Microsoft Edge.
+
+<sub>
+You could also add your own or just assemble all the included source files in the ./examples folder using the Netwide Assembler ("NASM") with ```for f in ./examples/*.asm; do nasm -O0 -f bin "$f";done```, if you also host these binary files alongside the previous files, they will appear under the "Examples" dropdown menu in GUI.
+</sub>
+ 
 ***
 
 ## Features
 
 
 | Emulation Capability | Current Status |
-| :--- | ---: |
+| :---: | :--- |
 | Instructions<sup>1</sup> | All, including illegal OpCodes |
 | Registers | Both User-accessible registers and Reserved Flags are available |
 | RAM | Supports up to 2^20 unique segmentated addresses with 16/8 Bit interfaces for interactions |
