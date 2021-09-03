@@ -33,16 +33,17 @@ This project was primarily done for two reasons:
 The emulator's source code has been thoroughly documented, except in places where doing so would have been considered extremely verbose or otherwise obivous.
 
 ## How To Compile And Run
-The easiest way to get EXACT up-and-running is by downloading the latest pre-built binaries from the [releases section](https://github.com/Thraetaona/EXACT/releases), unpacking the .zip file, running the Python script (serve.py) and lastly visiting http://localhost:8086/ using an updated browser that supports WeAssembly.
+The easiest way to get EXACT up-and-running is by downloading the latest pre-built binaries from the [releases section](https://github.com/Thraetaona/EXACT/releases), unpacking the .zip file, running the Python script (serve.py) and lastly visiting http://localhost:8086/ using an updated browser that supports WeAssembly. <br>
 If done correctly, you should see a page identical to this: https://Thraetaona.github.io/EXACT
 
----
 
 Alternatively you could follow the below instructions for a manual build:
 
+---
+
 First install the official WebAssembly Binary Toolkit ("WABT") using your package manager or from [their GitHub Repository](https://github.com/WebAssembly/wabt).
 
-Next, Assemble the source code with: 
+Next, assemble the source code with: 
 ```
 wat2wasm ./src/8086.wat -o ./src/8086.wasm
 ```
