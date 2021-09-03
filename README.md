@@ -34,6 +34,7 @@ The emulator's source code has been thoroughly documented, except in places wher
 
 ## How To Compile And Run
 The easiest way to get EXACT up-and-running is by downloading the latest pre-built binaries from the [releases section](https://github.com/Thraetaona/EXACT/releases), unpacking the .zip file, running the Python script (serve.py) and lastly visiting http://localhost:8086/ using an updated browser that supports WeAssembly.
+If done correctly, you should see a page identical to this: https://Thraetaona.github.io/EXACT
 
 ---
 
