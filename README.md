@@ -68,6 +68,7 @@ You could also add your own or just assemble all the included source files in th
 
 ## Features
 
+![Overview of EXACT](https://user-images.githubusercontent.com/42461518/147782528-bdb22a37-e85a-4901-996f-bd3260a90f8e.jpg)
 
 | Emulation Capability | Current Status |
 | :---: | :--- |
